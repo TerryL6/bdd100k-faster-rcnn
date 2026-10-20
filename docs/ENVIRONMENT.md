@@ -105,7 +105,7 @@ From the repository root, invoke the project interpreter directly:
 
 When configuring an editor, select `.venv/Scripts/python.exe` as this project's interpreter. Shell activation is optional; no PowerShell execution policy was changed during setup. Keep `.venv/` ignored and recreate it from the recorded dependencies on another machine rather than copying the directory.
 
-Repeat version, dependency, CPU/CUDA operator, image-conversion, and synthetic COCOeval checks after recreating or changing the environment. Dataset adapter implementation and training remain separate later stages. Batch size and other training settings have not been selected; operator checks do not establish that a full training batch fits in GPU memory.
+Repeat version, dependency, CPU/CUDA operator, image-conversion, and synthetic COCOeval checks after recreating or changing the environment. Data-loading verification is recorded separately in [Current Status](CURRENT_STATUS.md); the environment checks alone do not validate a dataset adapter or model pipeline. Training batch size and other training settings have not been selected; operator checks do not establish that a full training batch fits in GPU memory.
 
 ## Official Compatibility References
 

@@ -130,8 +130,12 @@ That working pair is now independently installed in a clean local `.venv`, with 
 
 ## Current Scope and Open Decisions
 
-Repository initialization and isolated environment setup/verification are complete. No dataset adapter, training/evaluation code, pretrained weights, or model training runs have been added. The next stage is a minimal COCO dataset adapter and batch loading verification, without changing the supplied dataset.
+Repository initialization, isolated environment setup/verification, and the training/validation Dataset and DataLoader stage are complete. `src/dataset.py` reads only the fixed cleaned COCO `train` and `val` splits, keeps their original image/category IDs and category order, and checks categories against `class_mapping.json`. Images are original-size RGB float32 tensors in `[0, 1]`; boxes become float32 `xyxy` only in memory. Targets retain source `area` and `iscrowd`, along with int64 labels and a one-element int64 image ID. No source boxes are clipped, filtered, or rounded.
 
-The training seed, optimizer, learning rate, scheduler, batch size, epoch count, image transforms, and checkpoint selection details have not been chosen or verified. Resolve these in later authorized stages instead of presenting defaults as completed decisions. Existing GPU operator checks do not prove full-model training compatibility or memory capacity for a particular batch size.
+Detection collation returns image and target lists so object counts may differ within a batch. `make_dataloader` keeps the final partial batch and exposes batch size, shuffling, and worker count. `src/check_data.py` provides a small CPU-only training/validation smoke check with optional previews in ignored `outputs/data_check/`. Its sample selection and batch defaults are checking settings, not new dataset definitions or training choices. The source dataset remains unchanged. See the root README for commands and the current status for actual verification scope.
+
+No model construction, training/evaluation code, pretrained weights, or model training runs have been added. Model integration and its verification require a later authorized stage.
+
+The training seed, optimizer, learning rate, scheduler, training batch size, epoch count, model resize/normalization, augmentation, and checkpoint selection details have not been chosen or verified. Resolve these in later authorized stages instead of presenting loader check defaults as completed decisions. Existing GPU operator checks do not prove full-model training compatibility or memory capacity for a particular batch size.
 
 Every user-facing chat response must use Simplified Chinese. All new or edited project-owned content must use English. Git commits and pushes require explicit user confirmation.
