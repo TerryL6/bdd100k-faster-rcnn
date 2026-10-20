@@ -1,0 +1,10 @@
+{
+  "seed": 0,
+  "batch_size": 2,
+  "steps": 3,
+  "optimizer": {
+    "lr": 0.001,
+    "momentum": 0.9,
+    "weight_decay": 0.0005
+  }
+}

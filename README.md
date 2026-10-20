@@ -2,7 +2,7 @@
 
 Faster R-CNN baseline for a university Deep Learning group project using a prepared BDD100K 10k subset. This repository covers baseline training and evaluation; other group members maintain the dataset preparation and shared evaluation tooling.
 
-**Current stage:** fixed training/validation Dataset and DataLoader implemented and checked with a small sample. No model, training, or evaluation implementation exists yet, and no model results have been measured.
+**Current stage:** Dataset/DataLoader, pretrained Faster R-CNN integration, and a bounded training/checkpoint check are implemented. Three two-image GPU batches completed real SGD updates, including one step after checkpoint restoration. Full baseline training and AP evaluation have not been performed; model performance remains unmeasured.
 
 ## Project Layout
 
@@ -21,15 +21,19 @@ bdd100k-faster-rcnn/
 |-- src/
 |   |-- __init__.py            # Python package
 |   |-- dataset.py             # COCO Dataset, detection collation, and DataLoader
-|   `-- check_data.py          # Training/validation data-loading smoke check
-|-- configs/                   # Reserved for future experiment configuration
+|   |-- check_data.py          # Training/validation data-loading smoke check
+|   |-- model.py               # Official pretrained Faster R-CNN with an 11-class head
+|   |-- check_model.py         # GPU loss/backward/inference check; no optimizer step
+|   `-- check_training.py      # Bounded SGD updates and checkpoint reload check
+|-- configs/
+|   `-- training_check.json    # Small training-check settings; not a tuned baseline
 |-- data/                      # Local dataset; ignored by Git
 |   `-- bdd100k_subset_10k/
-|-- outputs/                   # Local check previews and future run artifacts; ignored
+|-- outputs/                   # Local checks, weight cache, and future artifacts; ignored
 `-- .gitignore
 ```
 
-`configs/` still contains only a `.gitkeep` placeholder. The ignored `.venv/`, `data/`, and `outputs/` directories are local and will not appear in a fresh clone. Recreate the environment using the documented setup commands only when it does not already exist, and keep the supplied dataset at the path shown above. The check command creates its output directory when previews are requested.
+The ignored `.venv/`, `data/`, and `outputs/` directories are local and will not appear in a fresh clone. Recreate the environment using the documented setup commands only when it does not already exist, and keep the supplied dataset at the path shown above. Check commands create their own output directories. `training_check.json` contains checking settings; a formal baseline training configuration remains to be defined.
 
 ## Dataset
 
@@ -59,7 +63,7 @@ The project's isolated `.venv` uses Python 3.13.15, Torch 2.14.0+cu130, Torchvis
 
 See [Environment Setup and Verification](docs/ENVIRONMENT.md) for installation order, verification scope, and how to select the project interpreter. [requirements.txt](requirements.txt) pins direct dependencies; [requirements-lock.txt](requirements-lock.txt) records the 15 installed package versions, including transitive dependencies and packaging tools. Follow the two-step Torch-index installation order when recreating the environment.
 
-There is no training script, evaluation script, or runnable experiment configuration yet. The successful operator checks do not establish that the complete detection/evaluation pipeline works.
+The bounded training check below verifies a few real parameter updates and checkpoint save/reload. There is no full-epoch training driver or evaluation script yet. These checks do not establish long-run training stability, a suitable baseline configuration, or evaluation correctness.
 
 Before continuing in a new session, read [Working Rules](AGENTS.md), [Project Context](docs/PROJECT_CONTEXT.md), and [Current Status](docs/CURRENT_STATUS.md). Consult [Experiment Log](docs/EXPERIMENT_LOG.md) for actual run history.
 
@@ -103,7 +107,47 @@ loader = make_dataloader(dataset, batch_size=2, shuffle=True, num_workers=0)
 images, targets = next(iter(loader))
 ```
 
-For custom scripts with `num_workers > 0` on Windows, create and iterate loaders inside a function called under `if __name__ == "__main__":`. The supplied check command already has this guard. Data loading stays on CPU; GPU transfer and all model/training choices belong to later stages.
+For custom scripts with `num_workers > 0` on Windows, create and iterate loaders inside a function called under `if __name__ == "__main__":`. The supplied check commands already have this guard. Data loading stays on CPU; `check_model` explicitly transfers its image and target lists to the GPU.
+
+## Model Integration and GPU Check
+
+From the repository root, use the existing environment:
+
+```powershell
+& .\.venv\Scripts\python.exe -m src.check_model
+```
+
+CUDA is required. The command uses the first and last image of each fixed training/validation split, in one two-image batch per split, with `shuffle=False`, `num_workers=0`, float32, no AMP, and check seed 0. These are smoke-check settings, not selected training hyperparameters. Override only the dataset location with `--data-root <path>` when needed; keep configuration outside `data/`.
+
+`src.model.build_model()` loads the complete official `FasterRCNN_ResNet50_FPN_Weights.COCO_V1` detection weights, then replaces the predictor with a new `FastRCNNPredictor` for 11 classes. Dataset IDs 1-10 remain unchanged and background is 0; no pretrained COCO category mapping is reused. The new head is randomly initialized and has not been fine-tuned. The pretrained factory's default backbone behavior is retained: `layer2`, `layer3`, and `layer4` are trainable, while the earlier body stages are frozen. This has not been selected through training experiments.
+
+The first check downloads approximately 160 MiB from the [official PyTorch weight URL](https://download.pytorch.org/models/fasterrcnn_resnet50_fpn_coco-258fb6c6.pth) into `outputs/torch/hub/checkpoints/fasterrcnn_resnet50_fpn_coco-258fb6c6.pth`; subsequent checks reuse this cache. The factory sets Torch Hub's process-wide cache directory inside ignored `outputs/`. The report records the exact weight enum, source URL, size, and SHA-256. No extra ImageNet backbone download is needed. See the [official model interface](https://docs.pytorch.org/vision/stable/models/generated/torchvision.models.detection.fasterrcnn_resnet50_fpn.html) and [head-replacement tutorial](https://docs.pytorch.org/tutorials/intermediate/torchvision_tutorial.html).
+
+The existing loader returns `images` as a list of RGB `[3, H, W]` float32 tensors in `[0, 1]`, and `targets` as a matching list of dictionaries. The check moves both lists' tensors to CUDA. In training mode, `model(images, targets)` returns four scalar losses: classifier, box regression, RPN objectness, and RPN box regression. The check verifies each loss and their sum, calls `backward()` once, checks finite/nonzero gradients, and clears them. It creates no optimizer and performs no parameter update.
+
+In `model.eval()` with `torch.inference_mode()`, `model(images)` returns a list of predictions, one per image: `boxes` float32 `[N, 4]` in original input pixel `xyxy`, `labels` int64 `[N]` using IDs 1-10, and `scores` float32 `[N]`. Validation targets are loaded for sample metadata but are not passed to inference or used for AP. The check verifies shapes, types, device, finite values, ranges, and the exact coordinate scaling from internal resized boxes to public outputs. Empty predictions are valid. It also compares every model parameter and buffer against its pre-forward value exactly.
+
+Keep normalization and resizing inside the model; do not call a second normalization/resize transform in the Dataset. Retained Torchvision defaults are mean `[0.485, 0.456, 0.406]`, std `[0.229, 0.224, 0.225]`, `min_size=(800,)`, `max_size=1333`, bilinear resize with aspect ratio preserved, and zero padding to multiples of 32. On the checked `720 x 1280` inputs, actual resized dimensions are `749 x 1333`, and the padded batch shape is `[2, 3, 768, 1344]`. Inference defaults remain score threshold 0.05, NMS IoU 0.5, and at most 100 detections per image; none were tuned.
+
+The command overwrites `outputs/model_check/report.json` with the current attempt's status and, on success, configuration and results. The verified run produced finite total loss `3.7880015373`, 72 finite/nonzero gradient tensors, and correctly shaped predictions for both validation images. These losses and predictions do not measure model performance. AP is `Not measured`; test evaluation is `Not evaluated`. No trained checkpoint or prediction file is saved. See [Current Status](docs/CURRENT_STATUS.md) for full verification evidence and remaining work.
+
+## Bounded Training and Checkpoint Check
+
+Use the existing environment from the repository root:
+
+```powershell
+& .\.venv\Scripts\python.exe -m src.check_training
+```
+
+This command performs real parameter updates. Default settings are in `configs/training_check.json`: seed 0, batch size 2, three steps, and SGD with learning rate 0.001, momentum 0.9, and weight decay 0.0005. Only the first six annotation-order training images are used, with `shuffle=False`, `num_workers=0`, float32, no AMP, no scheduler, and no augmentation. Model resizing and normalization stay unchanged. These settings were chosen to verify the process, not selected using validation performance.
+
+Each step clears gradients, computes and checks the four losses, runs backward, verifies gradients, and calls `optimizer.step()`. The check confirms that backbone and replacement-head parameters actually change while frozen parameters stay unchanged. After step 2, it saves a checkpoint, rebuilds the model and optimizer, restores model/SGD momentum/CPU and CUDA RNG state, and completes step 3 on the next two images. It compares the saved/loaded states exactly and verifies the final checkpoint against its live model and optimizer.
+
+Each invocation creates a new `outputs/training_check/<timestamp>/` directory with `config.json`, per-step `steps.jsonl`, a `report.json` containing running/passed/failed/interrupted status, `checkpoint_before_resume.pth`, and `checkpoint_final.pth`. Existing model-check reports and cached official weights are preserved. The verified default run completed three updates with losses approximately `4.053978`, `3.588855`, and `3.706026`. Different batches contain different images; these values do not establish convergence or model performance.
+
+Optional `--config <path>` and `--data-root <path>` keep local settings outside `data/`. The check is bounded to 2-10 steps and batch sizes 1-2, with exactly one step after checkpoint restoration. It does not implement arbitrary shuffled/multi-worker resume, compare an uninterrupted training trajectory, evaluate validation/test data, select a checkpoint, or produce prediction images. The checkpoints contain only a few updates and are not a trained baseline. A fresh `build_model()` still initializes from official weights and a new head; it does not automatically load either check checkpoint.
+
+Checkpoint handling uses PyTorch `state_dict` APIs and `torch.load(..., weights_only=True)`; see the [official save/load tutorial](https://docs.pytorch.org/tutorials/beginner/saving_loading_models.html). See [Experiment Log](docs/EXPERIMENT_LOG.md) and [Current Status](docs/CURRENT_STATUS.md) for the actual run, artifacts, and remaining work.
 
 ## Git Hygiene
 

@@ -6,7 +6,7 @@ Last verified: 2026-10-19.
 
 The isolated project environment has been created at `.venv` using the existing CPython 3.13.15 installation. All selected dependencies are installed, `pip check` passed, and the CPU/CUDA operator and synthetic COCOeval checks passed inside this environment. Global packages were not changed.
 
-No pretrained weights were downloaded, no Faster R-CNN detector was constructed, and no training or evaluation on dataset images was performed. COCOeval was exercised only with tiny synthetic ground truth and predictions held in memory.
+During the environment-setup stage, no pretrained weights were downloaded, no Faster R-CNN detector was constructed, and no training or evaluation on dataset images was performed. COCOeval was exercised only with tiny synthetic ground truth and predictions held in memory. Later stages reused this environment for a small GPU loss/backward/inference check and a three-step SGD/checkpoint save/reload check; see [Current Status](CURRENT_STATUS.md). No dependencies were installed or changed for those stages.
 
 ## Observed Host
 
@@ -53,7 +53,7 @@ Checks executed with `.venv/Scripts/python.exe`:
 - The COCO checks preserved a non-positional synthetic image ID, used no BDD100K data, and produced no model performance measurements.
 - Final direct dependency versions match `requirements.txt`; all 15 installed distribution versions, including pip and setuptools, are captured in `requirements-lock.txt`.
 
-These are environment checks with synthetic inputs, not model experiments. They do not validate the complete Faster R-CNN pipeline, dataset loader, training memory requirements, checkpoint handling, or full-dataset evaluation. No training experiment entry has been added to `docs/EXPERIMENT_LOG.md`.
+These are environment checks with synthetic inputs, not model experiments. They do not by themselves validate the complete Faster R-CNN pipeline, dataset loader, training memory requirements, checkpoint handling, or full-dataset evaluation. No training experiment entry was added for the environment stage. The later bounded real-update check is recorded separately in `docs/EXPERIMENT_LOG.md`.
 
 ## Installed Dependencies and Isolation
 

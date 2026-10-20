@@ -1,6 +1,6 @@
 # Project Context
 
-Last updated: 2026-10-19.
+Last updated: 2026-10-20.
 
 ## Project and Responsibility
 
@@ -111,7 +111,7 @@ Subsets overlap, so their counts cannot be added together. For example, an image
 ## Model and Evaluation Plan
 
 - Frameworks: PyTorch and Torchvision.
-- Baseline: pretrained Faster R-CNN ResNet50-FPN, fine-tuned for the ten supplied foreground categories. Adapt the prediction head and handle the model's background convention during implementation while preserving source category IDs.
+- Baseline: Torchvision `fasterrcnn_resnet50_fpn` initialized with explicit `FasterRCNN_ResNet50_FPN_Weights.COCO_V1`, then a new `FastRCNNPredictor` for 11 outputs (foreground IDs 1-10, background 0). A bounded three-step update/checkpoint check is complete; full baseline fine-tuning has not started. Never use the pretrained COCO category mapping for this dataset.
 - Keep the implementation small and use existing framework functionality where practical.
 - Fine-tune on training only. Use validation for checkpoint selection and justified hyperparameter changes.
 - Use standard COCOeval provisionally because the group's shared evaluation script has not been supplied. Reconcile settings and outputs when it arrives.
@@ -134,8 +134,18 @@ Repository initialization, isolated environment setup/verification, and the trai
 
 Detection collation returns image and target lists so object counts may differ within a batch. `make_dataloader` keeps the final partial batch and exposes batch size, shuffling, and worker count. `src/check_data.py` provides a small CPU-only training/validation smoke check with optional previews in ignored `outputs/data_check/`. Its sample selection and batch defaults are checking settings, not new dataset definitions or training choices. The source dataset remains unchanged. See the root README for commands and the current status for actual verification scope.
 
-No model construction, training/evaluation code, pretrained weights, or model training runs have been added. Model integration and its verification require a later authorized stage.
+The separately authorized model-integration stage is complete. `src/model.py` loads the official COCO_V1 detection weights before replacing the head; Torch Hub's process-wide cache is set to `outputs/torch/hub/`, with weights under its `checkpoints/` directory. The exact source URL and downloaded-file SHA-256 are recorded in current status and the local check report. No additional ImageNet backbone weights are needed.
 
-The training seed, optimizer, learning rate, scheduler, training batch size, epoch count, model resize/normalization, augmentation, and checkpoint selection details have not been chosen or verified. Resolve these in later authorized stages instead of presenting loader check defaults as completed decisions. Existing GPU operator checks do not prove full-model training compatibility or memory capacity for a particular batch size.
+`src/check_model.py` reuses the existing Dataset and DataLoader for one two-image training-mode loss/backward check and one two-image validation inference check on CUDA. It verifies finite individual/total losses, finite gradients with a nonzero backbone/head signal, public prediction shapes/types/ranges, and coordinate restoration from internal resized boxes. Every model parameter and buffer is compared exactly before/after; no optimizer is constructed or stepped. The head remains untrained. These are integration checks, not training experiments or performance measurements. No test data is loaded and no AP is calculated.
+
+Images remain original-size RGB float32 in `[0, 1]` until entering the detector. Use its built-in normalization/resize only: mean `[0.485, 0.456, 0.406]`, std `[0.229, 0.224, 0.225]`, `min_size=(800,)`, `max_size=1333`, aspect-preserving bilinear interpolation (`align_corners=False`), no fixed size, and batch padding to multiples of 32. The model rescales target boxes internally and restores predictions to original input pixel `xyxy` coordinates. The checked `720 x 1280` images became `749 x 1333`, padded to `768 x 1344`. Do not interpret weight metadata's `min_size=(1, 1)` as the detector resize setting.
+
+Retain the pretrained factory defaults for this integration stage: FrozenBatchNorm2d, trainable backbone body stages `layer2`/`layer3`/`layer4`, inference score threshold 0.05, NMS IoU 0.5, and maximum 100 detections per image. These settings have not been tuned. The check uses seed 0, batch size 2, no shuffling, no workers, float32, and no AMP; these are checking settings rather than selected training hyperparameters, and deterministic algorithms are not enforced.
+
+The separately authorized bounded training/checkpoint stage is also complete. `src/check_training.py` reuses the original model and loader without changing `src/check_model.py`. It performs real SGD updates, checks finite losses/gradients/parameters, verifies parameter changes and frozen-parameter preservation, saves model/optimizer/RNG/config/data-position state, then rebuilds and restores before the final update. Defaults in `configs/training_check.json` are seed 0, three two-image steps, SGD learning rate 0.001, momentum 0.9, and weight decay 0.0005. Use only the first six fixed training images in annotation order, no shuffling or workers, float32, no AMP/scheduler/augmentation. These are process-check settings, not a tuned baseline configuration.
+
+Store all check runs under unique `outputs/training_check/<timestamp>/` directories. Save `state_dict` tensors and basic Python values, load with `weights_only=True`, and restore CPU/CUDA RNG after model and DataLoader iterator construction. Model state, SGD momentum/hyperparameters/devices, category mapping, transform settings, configuration, batch position, and RNG restoration were checked, followed by one successful continued update. This covers the current sequential single-worker check only; arbitrary shuffled/multi-worker resume and bitwise agreement with an uninterrupted trajectory have not been verified. Checkpoints contain a few real updates, not a trained or validation-selected baseline. `build_model()` still creates a fresh official-weight model with a new predictor on each call and does not load these checkpoints automatically.
+
+The formal training seed, optimizer/learning-rate policy, scheduler, training batch size, epoch count, augmentation, and checkpoint-selection details remain unresolved. Resolve these in later authorized stages. The small real-update/checkpoint check does not establish long-run stability or validate full-dataset evaluation. Model metrics remain `Not measured`; test evaluation remains `Not evaluated`. The user requested removal of temporary prediction visualizations; keep model/training checks free of drawing code and generated prediction previews.
 
 Every user-facing chat response must use Simplified Chinese. All new or edited project-owned content must use English. Git commits and pushes require explicit user confirmation.
