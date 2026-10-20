@@ -1,0 +1,53 @@
+# Local datasets and generated experiment artifacts
+/data/
+/outputs/
+
+# Model weights and exported models
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.safetensors
+
+# Python bytecode, caches, and test reports
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+.tox/
+.nox/
+
+# Virtual environments and local secrets
+.venv/
+venv/
+env/
+ENV/
+.env
+.env.*
+!.env.example
+
+# Python build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Editor, operating system, and temporary files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
+*.log
+*.tmp
+*.temp
+*.swp
+*.swo
+*~

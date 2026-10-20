@@ -1,0 +1,7 @@
+# Install the CUDA-specific Torch pair first, as documented in docs/ENVIRONMENT.md.
+# These are direct dependency pins, not a complete transitive lockfile.
+torch==2.14.0+cu130
+torchvision==0.29.0+cu130
+numpy==2.5.3
+Pillow==12.3.0
+pycocotools==2.0.11
