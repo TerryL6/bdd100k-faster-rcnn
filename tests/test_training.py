@@ -16,6 +16,7 @@ from torch.utils.data import Dataset
 from src import train
 from src.dataset import make_dataloader
 from src.model import SquarePadTransform, get_transform_settings
+from torchvision.models.detection.transform import GeneralizedRCNNTransform
 
 
 class SyntheticDataset(Dataset):
@@ -181,6 +182,22 @@ class TrainingTests(unittest.TestCase):
                     {**saved, "categories": [{"id": 2, "name": "car"}]}):
             with self.assertRaisesRegex(ValueError, "unchanged"):
                 train.validate_resume_settings(old, settings, categories)
+
+    def test_default_resize_resume_rejects_square_and_legacy_metadata(self):
+        settings = {"seed": 42, "num_workers": 0, "transform": get_transform_settings(
+            GeneralizedRCNNTransform(800, 1333, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        )}
+        categories = [{"id": 1, "name": "person"}]
+        saved = {"settings": copy.deepcopy(settings), "categories": copy.deepcopy(categories)}
+        train.validate_resume_settings(saved, settings, categories)
+        square = get_transform_settings(
+            SquarePadTransform(640, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        )
+        for previous_settings in ({"seed": 42}, {**settings, "transform": square}):
+            with self.subTest(settings=previous_settings), self.assertRaisesRegex(ValueError, "without --resume"):
+                train.validate_resume_settings(
+                    {"settings": previous_settings, "categories": categories}, settings, categories
+                )
 
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@ import torch
 from torchvision.models.detection.transform import GeneralizedRCNNTransform
 from torchvision.ops import MultiScaleRoIAlign
 
+from src import train
 from src.model import (
     NUM_CLASSES, WEIGHTS, SquareCanvasRoIAlign, SquarePadTransform,
     build_model, get_transform_settings,
@@ -170,6 +171,49 @@ class SquareCanvasPoolTests(unittest.TestCase):
             self.assertEqual(getattr(result.roi_heads.box_roi_pool, name), getattr(pooler, name))
         self.assertEqual((result.roi_heads.score_thresh, result.roi_heads.nms_thresh,
                           result.roi_heads.detections_per_img), (0.05, 0.5, 100))
+
+
+class DefaultModelTests(unittest.TestCase):
+    def test_current_training_setting_preserves_native_transform_pooler_and_coordinates(self):
+        transform = GeneralizedRCNNTransform(800, 1333, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        pooler = MultiScaleRoIAlign(["0", "1", "2", "3"], 7, 2)
+        model = SimpleNamespace(
+            transform=transform,
+            roi_heads=SimpleNamespace(
+                box_predictor=SimpleNamespace(cls_score=SimpleNamespace(in_features=8)),
+                box_roi_pool=pooler,
+            ),
+        )
+        # Exercise the current entry-point setting, without constructing a detector.
+        with patch("src.model.fasterrcnn_resnet50_fpn", return_value=model) as factory, \
+                patch("src.model.torch.hub.set_dir"):
+            result = build_model(progress=False, image_size=train.IMAGE_SIZE)
+        factory.assert_called_once_with(weights=WEIGHTS, weights_backbone=None, progress=False)
+        self.assertIs(result.transform, transform)
+        self.assertIs(result.roi_heads.box_roi_pool, pooler)
+        self.assertEqual(type(result.transform), GeneralizedRCNNTransform)
+        self.assertEqual(type(result.roi_heads.box_roi_pool), MultiScaleRoIAlign)
+        self.assertEqual(result.roi_heads.box_predictor.cls_score.out_features, 11)
+        settings = get_transform_settings(result.transform)
+        self.assertEqual(settings["resize_policy"], "torchvision_default")
+        self.assertEqual(settings["min_size"], [800])
+        self.assertEqual(settings["max_size"], 1333)
+        self.assertIsNone(settings["canvas_size"])
+        self.assertEqual(settings["roi_pool_scale_reference"], "resized_image_sizes")
+
+        image = torch.ones((3, 720, 1280))
+        boxes = torch.tensor([[17.25, 31.5, 1200.75, 700.0]])
+        target = {"boxes": boxes.clone()}
+        image_list, transformed = transform([image], [target])
+        self.assertEqual(image_list.image_sizes, [(749, 1333)])
+        self.assertEqual(tuple(image_list.tensors.shape), (1, 3, 768, 1344))
+        transform.eval()
+        restored = transform.postprocess(
+            [{"boxes": transformed[0]["boxes"].clone()}], image_list.image_sizes, [(720, 1280)]
+        )
+        torch.testing.assert_close(restored[0]["boxes"], boxes, rtol=1e-6, atol=1e-4)
+        torch.testing.assert_close(target["boxes"], boxes, rtol=0, atol=0)
+        torch.testing.assert_close(image, torch.ones_like(image), rtol=0, atol=0)
 
 
 if __name__ == "__main__":

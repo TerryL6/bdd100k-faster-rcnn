@@ -19,7 +19,7 @@ from .model import REPO_ROOT, TORCH_HUB_DIR, WEIGHTS, build_model, get_transform
 # Provisional starting values, not tuned hyperparameters.
 DATA_ROOT = REPO_ROOT / "data" / "bdd100k_subset_10k"
 EPOCHS = 10  # Observation window; convergence is not established.
-IMAGE_SIZE = 640  # Aspect-preserving resize, then right/bottom padding inside the model.
+IMAGE_SIZE = None  # Torchvision defaults: short edge 800, long edge <= 1333, native batch padding.
 BATCH_SIZE = 2
 VAL_BATCH_SIZE = 2
 LEARNING_RATE = 0.005

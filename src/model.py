@@ -112,8 +112,9 @@ def build_model(*, progress: bool = True, image_size: int | None = None) -> Fast
     Torch Hub's process-wide weight cache is placed inside ignored outputs/.
     The first call downloads COCO_V1 if it is not already cached there.
     Normalization and resizing remain inside the detector. With image_size,
-    keep aspect ratio and pad to that square size; None retains Torchvision's
-    historical defaults. The Dataset supplies original-size RGB in [0, 1].
+    keep aspect ratio and pad to that square size for the historical experiment.
+    None preserves Torchvision's default transform and native ROI pooler.
+    The Dataset supplies original-size RGB in [0, 1].
     """
     torch.hub.set_dir(str(TORCH_HUB_DIR))
     model = fasterrcnn_resnet50_fpn(
