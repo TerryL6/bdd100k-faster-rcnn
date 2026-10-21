@@ -1,6 +1,7 @@
 """Check the training loop and epoch-boundary resume using tiny synthetic data."""
 
 import io
+import copy
 import random
 import tempfile
 import unittest
@@ -14,6 +15,7 @@ from torch.utils.data import Dataset
 
 from src import train
 from src.dataset import make_dataloader
+from src.model import SquarePadTransform, get_transform_settings
 
 
 class SyntheticDataset(Dataset):
@@ -155,6 +157,30 @@ class TrainingTests(unittest.TestCase):
         self.assertEqual(destination.read_bytes(), original)
         self.assertFalse(destination.with_suffix(".pth.tmp").exists())
         self.assertEqual(torch.load(destination, weights_only=True)["step"], 1)
+
+    def test_resume_rejects_missing_or_different_preprocessing(self):
+        settings = {"seed": 42, "transform": get_transform_settings(
+            SquarePadTransform(640, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        )}
+        categories = [{"id": 1, "name": "person"}]
+        saved = {"settings": copy.deepcopy(settings), "categories": copy.deepcopy(categories)}
+        train.validate_resume_settings(saved, settings, categories)
+        before = copy.deepcopy(saved)
+        for old_transform in (None, {"min_size": [800], "max_size": 1333},
+                              {**settings["transform"], "canvas_size": [800, 800]},
+                              {**settings["transform"], "padding_alignment": "center"}):
+            old = copy.deepcopy(saved)
+            if old_transform is None:
+                del old["settings"]["transform"]
+            else:
+                old["settings"]["transform"] = old_transform
+            with self.subTest(transform=old_transform), self.assertRaisesRegex(ValueError, "without --resume"):
+                train.validate_resume_settings(old, settings, categories)
+        self.assertEqual(saved, before)
+        for old in ({**saved, "settings": {**settings, "seed": 0}},
+                    {**saved, "categories": [{"id": 2, "name": "car"}]}):
+            with self.assertRaisesRegex(ValueError, "unchanged"):
+                train.validate_resume_settings(old, settings, categories)
 
 
 if __name__ == "__main__":

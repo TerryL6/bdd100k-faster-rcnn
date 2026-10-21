@@ -1,12 +1,20 @@
 # Current Status
 
-Last updated: 2026-10-20.
+Last updated: 2026-10-21.
 
 ## Current Stage
 
-The supplied `evaluate_team.py` is now the shared scoring standard. `src/evaluate.py` performs inference/output adaptation and directly delegates metrics to that script. Its original mAP/AP50/per-class protocol is preserved with compatibility fixes and additive metrics. Eighteen tests and an archived two-image prediction comparison passed. Full baseline training and complete-validation performance remain unmeasured.
+The user manually completed two independent experiments using historical Torchvision aspect-preserving short-edge target 800 / long-edge limit 1333 and batch padding to multiples of 32. The old one-epoch run `20261020_155352_056862` completed 3,500 updates over 7,000 training images and full 1,000-image validation: mean loss 0.9960320900596146, mAP 0.20033579847015223, AP50 0.422389717269082 and AP75 0.1666071423344876. It is preserved and is not a continuation source.
 
-The temporary inference visualization requested for inspection on 2026-10-20 was subsequently removed at the user's request, including its helper and separate preview/prediction exports. The original model, smoke-check command, and successful summary report are retained unchanged. This stage did not add visualization.
+The fresh five-epoch run `20261020_182545_580059` completed all five epochs / 17,500 updates and full validation every epoch. Saved mAP values are 0.1834592123086974, 0.22445889409023706, 0.23896501467662432, 0.25544452083836444 and 0.23822375438048712. Best is epoch 4 / step 14,000 (AP50 0.5170826995660548, AP75 0.21488694482832407). Latest checkpoint and existing `validation.json` / `predictions.json` belong to epoch 5 / step 17,500; do not present them as best-model details. Histories, saved reports and prediction-ID coverage were inspected; all four best/latest checkpoints were loaded on CPU with `weights_only=True` for metadata only. Epoch 4 detailed per-class/size/recall metrics and predictions are not retained separately. See `EXPERIMENT_LOG.md` for complete recorded results. These runs do not establish convergence or a final baseline.
+
+The next experiment is **prepared, not started**: `EPOCHS=10`, `IMAGE_SIZE=640`, fixed 640 x 640 canvas for train and validation, aspect-preserving resize and top-left alignment with right/bottom normalized-zero padding. Initialize from cached official COCO_V1 weights and a new 11-class head, without resuming either old run. Keep seed 42, batches 2/2, workers 0, `cuda:0`, SGD LR 0.005 / momentum 0.9 / weight decay 0.0005, float32, no AMP/scheduler/warmup/augmentation and unchanged normalization/freezing/thresholds. Full validation after every epoch and latest/best/history/validation/prediction saving remain enabled. Ten epochs are an observation window; new performance/duration are `Not measured`.
+
+This development stage completed **32 synthetic tests**, compilation and training CLI help using the existing `.venv`. Geometry, coordinate restoration/COCO export, source preservation, canvas-aware ROIAlign and old-transform resume rejection passed. The previous 18-test result remains historical; 32 is the actual full-suite result rerun in this stage. The shared `evaluate_team.py` remains the scoring standard. No real Faster R-CNN construction/training, real-data inference/scoring, benchmark, dependency installation/download, test access, cloud task, commit or push occurred. The assistant may only display training commands until the user explicitly instructs the assistant to execute training.
+
+Before/after SHA-256, sizes and modification times matched for all ten artifacts in the two completed run directories and four dataset contract files (README, mapping, train/val annotations). No training run directory was added. This is a 14-file preservation check, not a full-dataset audit; real images/test content were not read. The cached official weight SHA-256 matches the previously recorded `258fb6c638b15964ddcdd1ae0748c5eef1be9e732750120cc857feed3faac384`. Project English text, local Markdown links, JSON syntax and `git diff --check` passed. Data/outputs remain ignored and untracked; nothing is staged.
+
+The temporary inference visualization requested for inspection on 2026-10-20 was subsequently removed at the user's request, including its helper and separate preview/prediction exports. That historical removal preserved the original model, smoke-check command and successful summary report. The current 640 preparation changes `model.py` as described above; it adds no visualization and leaves the historical smoke-check command/report intact.
 
 ## Completed Initialization Work
 
@@ -58,17 +66,18 @@ The temporary inference visualization requested for inspection on 2026-10-20 was
 
 ## Remaining Work
 
-- Review and explicitly authorize the provisional single-epoch configuration before full execution; these are not tuned hyperparameters.
-- Full baseline fine-tuning, validation-based checkpoint selection, and full-dataset inference/evaluation.
-- Validation metrics, condition analysis, hyperparameter tuning, or final test evaluation.
+- The user will manually start the prepared fresh 640 x 640, ten-epoch experiment, without `--resume`; its settings remain provisional.
+- After it finishes, verify actual checkpoint/JSON identities, record measured results, and select by highest full-validation mAP. Do not mix either old run's history or epoch 5 predictions with the old epoch 4 best.
+- Validation condition analysis, justified hyperparameter tuning, final baseline selection, and final test evaluation remain pending.
 
 ## Known Issues and Limitations
 
-- The shared `evaluate_team.py` is now integrated. Prediction-export filtering across different models still needs a group-wide agreement; no full validation or condition analysis has run.
-- Isolated operators, sampled loading, detector integration, bounded SGD, and synthetic/real epoch-boundary continuation checks pass. Shuffled single-worker epoch restoration matches an uninterrupted trajectory in the synthetic CPU test. Long-run stability, full-dataset capacity/evaluation, multi-worker resume, arbitrary batch resume, and cross-hardware/version bitwise agreement remain unverified or unsupported. The version snapshot has no artifact hashes and targets the verified Windows/Python/CUDA combination.
+- The shared `evaluate_team.py` is integrated; six complete validation cycles across two independent experiments are recorded. Prediction-export filtering across models still needs group agreement. Target dimensions of 640 x 640 do not imply identical preprocessing: the user reports common YOLO letterboxing and RT-DETRv2 direct Resize. Condition analysis has not run.
+- Five complete train/val cycles succeeded in one run, but convergence and the new 640 experiment's real execution remain unverified. Shuffled single-worker restoration matches an uninterrupted trajectory in synthetic CPU tests. Multi-worker/arbitrary-batch resume and cross-hardware/version bitwise agreement remain unsupported. The version snapshot has no artifact hashes and targets the verified Windows/Python/CUDA combination.
 - Validation has no railway-train objects; that class's AP is not evaluable. Condition subsets overlap and have different sample and class distributions.
-- Earlier data-loading checks decoded eight distinct training/validation images; later model/training checks also used bounded samples. No full image-decoding, content-hash, or near-duplicate/video-leakage audit was performed. Environment-stage checks used synthetic inputs. The current implementation check performed sampled inference and COCOeval only, without full-validation evaluation.
-- There are no baseline model performance results. `build_model()` creates a new untrained predictor; check checkpoints contain only bounded updates. Check losses/predictions/sampled AP and dataset preparation reports must not be described as formal model performance. Deterministic algorithms are not enforced. Synthetic CPU continuation matched an uninterrupted trajectory; GPU numerical trajectory equality has not been tested.
+- Earlier implementation checks used bounded train/val samples; both user-launched experiments subsequently traversed complete train/val splits. This stage used temporary synthetic images and annotations only for execution checks. No full-dataset content-hash or near-duplicate/video-leakage audit was performed.
+- The single-epoch full-validation results are genuine model performance, but do not establish convergence or a final baseline. `build_model()` creates a new untrained predictor; historical check checkpoints contain only bounded updates. Check losses/predictions/sampled AP and dataset preparation reports are not full-validation performance. Deterministic algorithms are not enforced. Synthetic CPU continuation matched an uninterrupted trajectory; GPU numerical trajectory equality has not been tested.
+- Exact start/end times and wall-clock duration of both completed experiments are `Not measured`; the trainer does not log elapsed time. Directory names and file modification times are not exact duration measurements. Epoch 4 detailed reports/predictions were overwritten by epoch 5; no new old-best inference is authorized in this stage.
 
 ## Decisions to Preserve
 
@@ -76,6 +85,8 @@ The temporary inference visualization requested for inspection on 2026-10-20 was
 - The Dataset accepts only `train` and `val` in this stage, checks category order against `class_mapping.json`, returns original-size RGB float32 images in `[0, 1]`, and converts boxes to float32 pixel `xyxy` in memory. Keep original IDs, area, and crowd flags; do not round, clip, filter, or remap source boxes/categories.
 - Detection collation returns two lists; keep partial final batches. Loader check defaults do not establish training hyperparameters. Use the module entry point with its main guard for Windows multiprocessing.
 - Use Torchvision `fasterrcnn_resnet50_fpn` with explicit `FasterRCNN_ResNet50_FPN_Weights.COCO_V1`, loaded before replacing the head with `FastRCNNPredictor` for IDs 0-10. Store Torch Hub weights under ignored `outputs/torch/hub/`. Leave normalization and resizing inside the detector; see the actual settings below.
+- Current training passes `IMAGE_SIZE=640`: single original normalization, bilinear aspect-preserving resize with nominal scale `640 / max(H, W)`, upscaling allowed, `align_corners=False`, `recompute_scale_factor=True`; use actual integer content dimensions for box scaling. Pad only right/bottom to exactly 640 x 640, top-left aligned with box offsets 0, value 0 after normalization (raw channel means). Dataset images/boxes stay original. Retain content sizes for clipping/postprocess; use `SquareCanvasRoIAlign` for correct canvas-based FPN strides. Historical 800/1333 settings below describe previous runs/checks only.
+- Store preprocessing identity in report/checkpoint settings; reject old checkpoints without it or with different transforms. No-resume runs create a fresh timestamped directory. Preserve both old experiments and their original artifacts.
 - Use the verified Python 3.13 `.venv` and Torch 2.14.0+cu130 / Torchvision 0.29.0+cu130 pair for project execution; preserve the setup order and dependency pins documented in `docs/ENVIRONMENT.md`, `requirements.txt`, and `requirements-lock.txt`.
 - Use validation for selection and tuning; reserve test performance for final evaluation after choices are fixed.
 - Keep data and generated artifacts local and ignored. Require explicit user confirmation for every commit and push.
@@ -146,7 +157,7 @@ The temporary inference visualization requested for inspection on 2026-10-20 was
 - SHA-256: `258fb6c638b15964ddcdd1ae0748c5eef1be9e732750120cc857feed3faac384`. The official downloader checked the filename hash prefix on initial download. The full digest was recorded independently after loading.
 - `build_model()` sets Torch Hub's process-wide cache directory before constructing the model. Subsequent calls reuse the local cache. `weights_backbone=None` avoids any separate ImageNet weight download. No trained project checkpoint existed at the end of the model-integration stage; later bounded training-check checkpoints are recorded below.
 
-### Actual Model Transform and Defaults
+### Historical Model-Integration Transform and Defaults
 
 - Dataset preprocessing is unchanged: original-size RGB float32 `[0, 1]`, with target pixel `xyxy` boxes. No duplicate channel normalization, resizing, or augmentation was added.
 - Built-in mean: `[0.485, 0.456, 0.406]`; std: `[0.229, 0.224, 0.225]`.
@@ -237,9 +248,9 @@ Added `src/training.py`, `src/train.py`, `src/evaluation.py`, `src/evaluate.py`,
 - Integrity evidence in `outputs/epoch_implementation_check/` confirms unchanged SHA-256, sizes, and modification times for the dataset README, class mapping, train/val annotation JSON and five sampled images (9 files). No source dataset file was written or any test annotation/image opened. This is not a full-dataset integrity audit. Existing `.venv` and official cached weights were reused without installation or downloads.
 - Compilation, CLI help, synthetic tests, Git whitespace, project-owned English text, and local documentation links passed. Independent read-only code review found no actionable correctness issue. Git checks confirm dataset, `.venv`, outputs, cached weights/checkpoints and caches are ignored and untracked, with no staged changes. No commit or push occurred.
 
-## Next Authorized Execution Decision
+## Historical Execution Decision Before the First Complete Run
 
-Review the settings at the top of `src/train.py` and the README training command, then obtain the user's explicit confirmation before the first complete train epoch and complete validation. Long-run stability, full validation performance, condition subsets, tuning and final test evaluation remain unfinished. Baseline mAP/AP50/AP75/per-class results are `Not measured`; test is `Not evaluated`. The group evaluator was supplied and integrated in the later stage recorded below. Current resume supports completed epoch boundaries with workers 0 and unchanged data/code/settings/environment; batch-level, multi-worker/distributed, and cross-environment bitwise continuation are unsupported. The simplified trainer does not compare data hashes or environment snapshots. Further commits and pushes require separate explicit confirmation.
+At this historical stage, full execution required a later user decision; full-validation metrics were `Not measured`. The user subsequently launched the one-epoch run recorded at the top of this document and in `EXPERIMENT_LOG.md`. The group evaluator was supplied and integrated in the later stage recorded below. Current resume supports completed epoch boundaries with workers 0 and unchanged data/code/settings/environment; batch-level, multi-worker/distributed, and cross-environment bitwise continuation are unsupported. The simplified trainer does not compare data hashes or environment snapshots. Further commits and pushes require separate explicit confirmation.
 
 ## Completed Readability Refactor
 
@@ -254,15 +265,15 @@ Review the settings at the top of `src/train.py` and the README training command
 - The real check verified unchanged hashes/sizes/mtimes for the dataset README, mapping, train/val annotation JSON and five images (9 source files). No test image/annotation was accessed; this is not a whole-dataset integrity audit. Existing output files were preserved.
 - Final Git checks confirm ignored data, outputs, `.venv`, cached weights/checkpoints and caches remain untracked. No staged changes, commit or push. README/context/environment/experiment records describe the simplified interface; historical entries retain their actual old paths/settings.
 
-## Run After User Confirmation
+## Manual Fresh 640 x 640 Ten-Epoch Run: Prepared, Not Started
 
-Edit the top of `src/train.py`, then use the existing environment:
+The user will run this command from the project root using the existing environment. It is shown for manual execution only and has not been executed by the assistant:
 
 ```powershell
 & .\.venv\Scripts\python.exe -m src.train
 ```
 
-Provisional settings remain one epoch, batch size 2, SGD LR 0.005, momentum 0.9, weight decay 0.0005 and seed 42. They are not tuned and one epoch is not assumed sufficient. The command traverses all 7,000 training images and evaluates all 1,000 validation images. No such complete run has been started. Baseline performance is `Not measured`; condition analysis is pending and test is `Not evaluated`.
+Current settings are ten epochs, fixed 640 x 640 aspect-preserving padded canvas for train/val, batches 2/2, SGD LR 0.005 / momentum 0.9 / weight decay 0.0005, seed 42, workers 0, CUDA device 0 and print interval 50. Float32, no AMP/scheduler/warmup/augmentation; normalization, freezing and thresholds are unchanged. Without `--resume`, the command initializes from cached official COCO_V1 weights and a new 11-class head in a new timestamped output directory. Each epoch uses all 7,000 training images (3,500 updates) and all 1,000 validation images. Ten completed epochs would total 35,000 updates; this is a plan, not measured progress or a convergence claim. All five save artifacts remain enabled; best uses full-validation mAP. No old checkpoint is a recovery source; missing/different preprocessing settings are rejected. New-run metrics/duration are `Not measured`; condition analysis is pending and test is `Not evaluated`.
 
 ## Completed Shared Team Evaluator Integration
 
@@ -283,10 +294,19 @@ Provisional settings remain one epoch, batch size 2, SGD LR 0.005, momentum 0.9,
 - Publication preparation verified local `main` and the live remote `main` at `b8f8239d0010246e010fcbfcc23f35e26893f36b`. The milestone comprises readable `src/train.py`, the inference adapter, shared team evaluator, three synthetic test modules and five updated README/context/status/environment/experiment documents (11 files). Existing Dataset/model/check scripts, supplied data and dependencies are unchanged.
 - Eighteen synthetic tests, compilation and both CLI help commands passed. An independent read-only review found no publication blocker. Git whitespace, English/local-document-link/JSON, ignore-rule and tracked-artifact checks passed. No data/output/environment/weight/checkpoint files are included.
 - Commit message: `Add readable training and shared team evaluation`. This document accompanies the authorized milestone; use Git history/status and the live remote ref for its actual identity and publication result. It does not embed its own future commit hash or predict push success. Further commits and pushes require separate user confirmation.
-- Full training, complete validation, real condition analysis and test evaluation remain unexecuted. There is no formal `outputs/training/` run or baseline score. Publication does not start training.
+- At that publication boundary, full training/validation had not run. The subsequent user-launched one- and five-epoch experiments are recorded above and in `EXPERIMENT_LOG.md`. Publication itself did not execute training. Real condition analysis and test evaluation remain unexecuted.
 
-## Next Chat: First Complete Baseline Run
+## Current Execution Boundary and Next Steps
 
-The user requested a copyable handoff prompt for a separate chat. In that chat, first read AGENTS/PROJECT_CONTEXT/CURRENT_STATUS/ENVIRONMENT/EXPERIMENT_LOG/README and inspect actual Git/files/output/process state. Use the existing `.venv` and cached official weights. Current settings are one epoch, train/val batch size 2, SGD LR 0.005, momentum 0.9, weight decay 0.0005, seed 42, workers 0 and CUDA device 0, with unchanged transforms, float32, no AMP/scheduler/augmentation. These are provisional values, not optimized settings.
+Read AGENTS/PROJECT_CONTEXT/CURRENT_STATUS/ENVIRONMENT/EXPERIMENT_LOG/README and inspect actual Git/files/output state before further work. The 640 preparation began at `a65cd736`; its publication review subsequently confirmed that revision on live remote `main`. Use Git history/status and the live remote ref for the current revision. Existing uncommitted README/context/status/environment/log/train/model changes and `test_model_transform.py` were preserved and extended. Both old run histories/reports/predictions and four CPU checkpoint metadata records were checked. Existing environment/hardware observations were reused, not remeasured.
 
-When the user explicitly starts that separate training task, run one complete pass over the fixed 7,000 training images (3,500 optimizer updates), followed by all 1,000 validation images scored through `evaluate_team.py`. Do not start another run if one is active, change the dataset, access test data, add epochs, retune settings, reinstall dependencies or publish new commits without applicable authorization. On success report actual losses/metrics/elapsed time/artifact path and verify latest/best at epoch 1/global step 3500. On failure record the actual error and partial progress; never claim completion. Checkpoints first appear after the complete training-and-validation boundary; no arbitrary batch resume exists. Record the actual completed/failed/interrupted experiment in EXPERIMENT_LOG and update CURRENT_STATUS in English, with Simplified Chinese user-facing reports.
+The assistant must not execute training or click Run; the user will manually start the new 640 x 640 ten-epoch experiment. Only an explicit later instruction for the assistant to execute training changes that boundary. This stage ends at code preparation, necessary synthetic checks and documentation synchronization. Do not extend it to condition analysis, old-best real inference, cloud migration or report PDF edits. Do not restore either old run, disable saving, modify/delete original artifacts, access test data, install dependencies/download weights or create paid tasks. Each commit and push requires explicit user confirmation; the new publication preparation below does not itself record a completed commit or push. Future checkpoints appear after complete train/validation boundaries; select by full-validation mAP, with test reserved for later final evaluation.
+
+## 640 Preparation Publication Review: 2026-10-21
+
+- The user requested synchronizing current progress to GitHub before manually starting training. Publication preparation preserves the existing changes; training remains prohibited for the assistant.
+- Read-only inspection confirmed local HEAD, local `origin/main` and live remote `main` all at `a65cd7369856dbe8427fe146b958c5a98da3b404`, with no staged changes before preparation.
+- The proposed milestone contains 12 project files: three model/train/evaluation modules, four synthetic test modules and five README/context/status/environment/experiment documents. It prepares fixed 640 x 640 ten-epoch training, correct canvas-based ROI pooling, preprocessing-aware resume checks and accurate historical one-/five-epoch results. No new training result is claimed.
+- Proposed commit message: `Prepare fixed 640 training and record completed experiments`. Target: the existing `origin/main` at `https://github.com/TerryL6/bdd100k-faster-rcnn.git`.
+- The previous implementation-stage 32 synthetic tests, compilation and CLI-help results remain valid recorded checks; they were not rerun during this publication review because source/test code has not changed. Whitespace, ignore rules and tracked-artifact scope were checked again. Data, outputs, checkpoints, weights, the local environment and PDF previews are excluded.
+- After reviewing this concrete 12-file milestone, the user explicitly authorized one commit and the subsequent push on 2026-10-21. This entry accompanies that authorized publication; it does not predict publication success or embed a future commit identity. Inspect Git history/status and the live remote ref for actual publication state. Further commits and pushes require new explicit confirmation.

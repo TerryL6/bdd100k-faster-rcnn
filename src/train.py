@@ -13,12 +13,13 @@ import torch
 
 from .dataset import BDD100KDataset, make_dataloader
 from .evaluate import evaluate
-from .model import REPO_ROOT, TORCH_HUB_DIR, WEIGHTS, build_model
+from .model import REPO_ROOT, TORCH_HUB_DIR, WEIGHTS, build_model, get_transform_settings
 
 
 # Provisional starting values, not tuned hyperparameters.
 DATA_ROOT = REPO_ROOT / "data" / "bdd100k_subset_10k"
-EPOCHS = 1
+EPOCHS = 10  # Observation window; convergence is not established.
+IMAGE_SIZE = 640  # Aspect-preserving resize, then right/bottom padding inside the model.
 BATCH_SIZE = 2
 VAL_BATCH_SIZE = 2
 LEARNING_RATE = 0.005
@@ -80,9 +81,10 @@ def main():
     val_loader = make_dataloader(val_dataset, batch_size=VAL_BATCH_SIZE, shuffle=False, num_workers=0)
 
     # 2. Load the pretrained detector and create its SGD optimizer.
-    model = build_model(progress=False).to(device)
+    model = build_model(progress=False, image_size=IMAGE_SIZE).to(device)
     settings = {"seed": SEED, "batch_size": BATCH_SIZE, "val_batch_size": VAL_BATCH_SIZE,
-                "device": DEVICE, "optimizer": {"lr": LEARNING_RATE, "momentum": MOMENTUM,
+                "device": DEVICE, "num_workers": 0, "transform": get_transform_settings(model.transform),
+                "optimizer": {"lr": LEARNING_RATE, "momentum": MOMENTUM,
                                                "weight_decay": WEIGHT_DECAY}}
     optimizer = make_optimizer(model, settings["optimizer"])
     start_epoch, global_step, best_map, best_epoch = 1, 0, -1.0, 0
@@ -98,8 +100,7 @@ def main():
         if saved.get("kind") != "bdd100k_simple_training_v1":
             raise ValueError("This entry point resumes only checkpoints from the simplified trainer.")
         categories = train_dataset.coco.dataset["categories"]
-        if saved["settings"] != settings or saved["categories"] != categories:
-            raise ValueError("Keep training settings and categories unchanged on resume; only EPOCHS may increase.")
+        validate_resume_settings(saved, settings, categories)
         start_epoch = saved["epoch"] + 1
         if EPOCHS < start_epoch or saved["global_step"] != saved["epoch"] * len(train_loader):
             raise ValueError("Increase EPOCHS and keep the same training dataset on resume.")
@@ -152,6 +153,13 @@ def main():
 
 
 # Small support functions are kept below the training flow.
+def validate_resume_settings(saved, settings, categories):
+    if saved["settings"].get("transform") != settings["transform"]:
+        raise ValueError("Checkpoint preprocessing differs or is missing. Start a fresh run without --resume.")
+    if saved["settings"] != settings or saved["categories"] != categories:
+        raise ValueError("Keep training settings and categories unchanged on resume; only EPOCHS may increase.")
+
+
 def make_optimizer(model, settings):
     return torch.optim.SGD([p for p in model.parameters() if p.requires_grad], **settings)
 

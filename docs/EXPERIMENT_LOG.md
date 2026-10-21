@@ -4,9 +4,13 @@ Last updated: 2026-10-20.
 
 ## Experiment Status
 
-No full baseline training or full-validation performance evaluation has been run. The original bounded training/checkpoint check completed three real SGD updates. The later epoch-driver functional check completed four additional updates across two three-image sample passes, with a disk restore between them and two-image validation plumbing checks. A later readability-refactor check completed four additional updates with the same three-train/two-val-image scope. These are not a trained baseline or validation-selected model. Project initialization and dataset preparation reports are not model experiments.
+The user manually completed two independent experiments using the original model-internal aspect-preserving `min_size=800`, `max_size=1333` preprocessing. Run `20261020_155352_056862` completed one full training epoch and complete-validation evaluation: 3,500 updates over 7,000 training images, then all 1,000 validation images; mAP is 0.20033579847015223. Fresh run `20261020_182545_580059` subsequently completed all five epochs and 17,500 updates with validation after every epoch. Its best checkpoint is epoch 4 / global step 14000, with mAP 0.25544452083836444, AP50 0.5170826995660548 and AP75 0.21488694482832407. Its latest checkpoint and current validation/prediction JSON files belong to epoch 5, whose mAP is 0.23822375438048712. These measured results do not establish convergence or a finalized baseline. The old artifacts are preserved.
 
-The 2026-10-19 model-integration smoke check loaded official COCO_V1 weights, replaced the head, checked one training-mode forward/backward batch without an optimizer step, and ran validation inference without AP. This is not a training experiment. Its configuration, losses, checks, and limitations are recorded in [Current Status](CURRENT_STATUS.md) and ignored `outputs/model_check/report.json`; no experiment entry is warranted. Model performance is `Not measured`, and test evaluation is `Not evaluated`.
+A separate fixed-640-by-640, ten-epoch observation experiment is prepared and has not started. It will use cached official COCO_V1 weights and a new 11-class predictor, with no restoration from either earlier experiment. Its training progress, validation results and duration are `Not measured`. The assistant is authorized to prepare code, synthetic checks and documentation only; training requires the user's later explicit instruction for the assistant to execute it.
+
+Earlier bounded training/checkpoint, epoch-driver and readability-refactor checks performed three, four and four updates respectively using tiny samples. Those historical process checks are not full-validation performance or selected baseline models. Project initialization and dataset preparation reports are not model experiments.
+
+The 2026-10-19 model-integration smoke check loaded official COCO_V1 weights, replaced the head, checked one training-mode forward/backward batch without an optimizer step, and ran validation inference without AP. This is not a training experiment. Its configuration, losses, checks, and limitations are recorded in [Current Status](CURRENT_STATUS.md) and ignored `outputs/model_check/report.json`; no experiment entry is warranted for that smoke check. Its performance is `Not measured`. Test evaluation of this repository's Faster R-CNN remains `Not evaluated`.
 
 ## Recording Rules
 
@@ -77,6 +81,124 @@ The 2026-10-19 model-integration smoke check loaded official COCO_V1 weights, re
 - **Artifacts/integrity:** `outputs/simplification_check/20261020_144730_143567/{check_refactor.py,report.json,sample_checkpoint.pth,sample_validation.json}`. Nine source files (README, mapping, train/val annotations and five images) retained hashes/sizes/mtimes. This is not a complete-dataset audit. Historical outputs/checkpoints are untouched; no visualizations were created.
 - **Other checks:** Nine synthetic unittest checks passed with the existing environment. They verify training-mode switching, actual updates, partial batches, uninterrupted-versus-restored shuffled CPU trajectories/RNG, non-finite loss rejection, failed atomic save preservation, and COCO/ID/mode/coverage/undefined-metric behavior. CLI help and compilation passed. No real run failed or was interrupted.
 - **Formal performance/next action:** Full validation mAP/AP50/AP75/per-class/size/recall/condition metrics remain `Not measured`; test remains `Not evaluated`. Review top-of-file settings and obtain user confirmation before `python -m src.train` starts complete train/val traversal. Resume is same-run, workers 0, unchanged data/code/environment/settings, completed boundaries only; no data/environment hash validation, batch-level resume or cross-environment bitwise guarantee. No commit or push.
+
+## First Complete Single-Epoch Run: 20261020_155352_056862
+
+- **Status/objective:** Completed by the user through a manual terminal command, not executed by the assistant. Establish the first measured full-epoch/full-validation result using the existing provisional settings. This is not a convergence claim or a finalized baseline.
+- **Evidence/code:** Saved `history.csv` and `validation.json` were inspected after completion; terminal output returned normally. Source milestone was `a65cd736`; the working tree was clean before the later five-epoch preparation. The simplified trainer does not save source hashes or a complete runtime snapshot, so no new source/runtime provenance measurement is claimed.
+- **Start/end/duration:** Exact start and end times and wall-clock training/validation duration: `Not measured`, because the trainer does not log them. The run directory name and artifact modification times are not substitutes for measured elapsed time.
+- **Configuration/data:** `src/train.py`, `EPOCHS=1`, seed 42, train/val batch size 2, train shuffle true, val shuffle false, workers 0, device `cuda:0`, print interval 50. SGD LR 0.005, momentum 0.9, weight decay 0.0005, default dampening 0, Nesterov disabled; float32, no AMP/scheduler/warmup/augmentation. Deterministic algorithms were not forced. One complete pass over fixed `annotations/train.json` and `images/train/` (7,000 images, 3,500 updates), followed by complete `annotations/val.json` and `images/val/` (1,000 images). Original category IDs 1-10 and image IDs were retained; background 0. No test evaluation or condition analysis.
+- **Model/environment:** Cached official `FasterRCNN_ResNet50_FPN_Weights.COCO_V1`, `fasterrcnn_resnet50_fpn`, a newly initialized 11-class predictor, unchanged internal normalization/800-1333 resize/padding/backbone defaults. Existing `.venv` and documented RTX 5070, Python 3.13.15, Torch 2.14.0+cu130, Torchvision 0.29.0+cu130, CUDA 13.0 and pycocotools 2.0.11. This environment description is inherited from the verified setup, not a new runtime measurement. No dependency installation or additional weight download was needed for preparation.
+- **Actual image-weighted training means:** `loss_classifier=0.3028968423924276`, `loss_box_reg=0.444215459299939`, `loss_objectness=0.07495462468772063`, `loss_rpn_box_reg=0.17396516367952738`, `total_loss=0.9960320900596146`. Saved history contains epoch 1 and global step 3500.
+- **Evaluation protocol:** `src/evaluate.py` delegates bbox scoring to shared `evaluate_team.py`/COCOeval; IoU thresholds 0.50:0.05:0.95, 101 recall thresholds, maxDets 1/10/100, standard small/medium/large area ranges, category-aware metrics on a 0-1 scale. Inference uses eval/inference mode, original image pixels/IDs and COCO xywh export. Detector score threshold 0.05, NMS IoU 0.5, maximum 100 detections per image; evaluator applies no additional score filter. Report contains `performance_result=true`, `split=val`, `epoch=1`, `image_count=1000` and 79,745 predictions.
+
+| Full-validation metric | Actual value (0-1) |
+|---|---:|
+| mAP (IoU 0.50:0.95) | 0.20033579847015223 |
+| AP50 | 0.422389717269082 |
+| AP75 | 0.1666071423344876 |
+| AP small | 0.09148089005032771 |
+| AP medium | 0.24903162551375516 |
+| AP large | 0.37799573736071296 |
+| AR maxDets 1 | 0.15513353280535255 |
+| AR maxDets 10 | 0.3107474782692513 |
+| AR maxDets 100 | 0.3343225680473746 |
+| AR small | 0.17267628872641438 |
+| AR medium | 0.38156113858606416 |
+| AR large | 0.5324282186768101 |
+
+| Category | GT objects | AP | AP50 | AP75 |
+|---|---:|---:|---:|---:|
+| person | 1280 | 0.26663664898545664 | 0.5731135164193837 | 0.20694134354106955 |
+| rider | 62 | 0.11392742159766159 | 0.2638216708051609 | 0.08163758209849026 |
+| car | 10236 | 0.3811753918084215 | 0.7176989915620244 | 0.36632522669009254 |
+| truck | 401 | 0.23143242115775386 | 0.3743771601446463 | 0.25203631135556726 |
+| bus | 165 | 0.23446348293731523 | 0.39611744666380083 | 0.24844835288290287 |
+| train | 0 | Not evaluable | Not evaluable | Not evaluable |
+| motor | 49 | 0.07262031204085541 | 0.21384151355187128 | 0.012820879352372925 |
+| bike | 88 | 0.09006252522835757 | 0.22612786682130778 | 0.07806709309663346 |
+| traffic light | 2714 | 0.1596092000774494 | 0.48446419995949364 | 0.05657871266731679 |
+| traffic sign | 3470 | 0.25309478239809885 | 0.551945089494049 | 0.19660877932594242 |
+
+- **Checkpoint/artifacts:** `outputs/training/20261020_155352_056862/` contains `latest.pth`, `best.pth`, `history.csv`, `validation.json` and `predictions.json`. Latest/best correspond to the only completed epoch, with terminal `best_epoch=1`; selection maximizes complete-validation mAP. No checkpoint tensor reload was performed while recording these results. Missing railway-class GT is excluded from COCO means, not zero-filled. Condition-specific results: `Not measured`; final test: `Not evaluated`.
+- **Observations/next decision:** One epoch successfully exercised the complete training/validation/save path. AP75 is below AP50 and small-object AP is below medium/large AP; this does not isolate causes or prove sufficient training. The user chose to disregard this run as a continuation source and begin a new five-epoch experiment. The existing run remains unchanged on disk; its epoch/results do not count toward or select checkpoints for the new experiment.
+
+## Completed Fresh Five-Epoch Run: 20261020_182545_580059
+
+- **Status/objective:** Completed manually by the user as an independent experiment. All five full training epochs and 17,500 optimizer updates completed, with complete validation after every epoch. The run initialized from cached official COCO_V1 weights and a new 11-class predictor, without resuming `20261020_155352_056862`. Neither experiment's history is combined with the other. Five epochs are an observation window, not evidence that the model has converged.
+- **Evidence/code:** Actual `history.csv`, `validation.json`, `predictions.json`, `best.pth` and `latest.pth` were inspected. Source milestone is `a65cd736` plus the existing preparation changes, including `EPOCHS=5`; the simplified trainer did not record source hashes or a complete runtime snapshot. The current audit loaded both this run's checkpoints and both single-epoch checkpoints using the existing `.venv`, `map_location="cpu"` and `weights_only=True`. It did not construct a detector or rerun training, image inference, scoring or timing.
+- **Start/end/duration:** Exact start/end times and wall-clock training/validation duration: `Not measured`, because the trainer does not record them. Directory names and file modification times do not establish elapsed training time.
+- **Configuration/data:** `EPOCHS=5`, seed 42, train/val batch size 2, train shuffle true, val shuffle false, workers 0, device `cuda:0`, print interval 50. SGD LR 0.005, momentum 0.9, weight decay 0.0005, default dampening 0 and Nesterov disabled; float32, no AMP, scheduler, warmup or added augmentation. Deterministic algorithms were not forced. Every training epoch traversed the fixed 7,000-image train split (3,500 updates), followed by the complete 1,000-image validation split. No condition analysis or test evaluation was performed.
+- **Model/environment:** `fasterrcnn_resnet50_fpn`, cached `FasterRCNN_ResNet50_FPN_Weights.COCO_V1`, newly initialized 11-class predictor, background 0 and original foreground category IDs 1-10. FrozenBatchNorm2d and trainable backbone body stages `layer2`/`layer3`/`layer4` were retained. Existing local `.venv` and documented RTX 5070 environment were reused; the current audit does not claim a new GPU/runtime measurement, dependency installation or weight download.
+- **Actual preprocessing:** Dataset returned original-size RGB float32 `[0, 1]` images and original pixel `xyxy` boxes. The detector applied mean `[0.485, 0.456, 0.406]` / std `[0.229, 0.224, 0.225]` once, aspect-preserving bilinear resizing with `align_corners=False`, short-side target 800 and long-side maximum 1333, no fixed canvas, then batch padding to multiples of 32. This experiment did not use fixed 640-by-640 input. Saved validation metadata confirms `min_size=[800]`, `max_size=1333`, `size_divisible=32` and `fixed_size=null`.
+
+Actual image-weighted training means:
+
+| Epoch | Global step | Classifier loss | Box loss | RPN objectness loss | RPN box loss | Total loss |
+|---:|---:|---:|---:|---:|---:|---:|
+| 1 | 3500 | 0.30418116176767007 | 0.4446390875152179 | 0.07661206300636487 | 0.17457908455508628 | 1.0000113968443392 |
+| 2 | 7000 | 0.26581182139686177 | 0.41452829025472915 | 0.05925446503529591 | 0.15908452140193965 | 0.8986790980888265 |
+| 3 | 10500 | 0.2510080945725952 | 0.401666601815394 | 0.05081439554518355 | 0.1521499016525756 | 0.8556389935857484 |
+| 4 | 14000 | 0.24190184214924063 | 0.3925883290384497 | 0.04686770626955799 | 0.14839652752596885 | 0.8297544049832172 |
+| 5 | 17500 | 0.23654089846994195 | 0.3886951625176838 | 0.044389868071968 | 0.14563250353892468 | 0.8152584325985185 |
+
+Actual complete-validation metrics, on a 0-1 scale:
+
+| Epoch | Global step | mAP (IoU 0.50:0.95) | AP50 | AP75 | Selection |
+|---:|---:|---:|---:|---:|---|
+| 1 | 3500 | 0.1834592123086974 | 0.3979016050818286 | 0.1465550345797109 | Earlier epoch |
+| 2 | 7000 | 0.22445889409023706 | 0.4664552216111791 | 0.1828126828849158 | Earlier epoch |
+| 3 | 10500 | 0.23896501467662432 | 0.49930742495009356 | 0.1896600548267454 | Earlier epoch |
+| 4 | 14000 | 0.25544452083836444 | 0.5170826995660548 | 0.21488694482832407 | Best checkpoint |
+| 5 | 17500 | 0.23822375438048712 | 0.5023644463985995 | 0.19519708766194233 | Latest checkpoint and JSON reports |
+
+- **Evaluation protocol:** Shared `evaluate_team.py` / category-aware bbox COCOeval, IoU 0.50:0.05:0.95, 101 recall thresholds, maxDets 1/10/100 and standard size ranges. Model inference score threshold 0.05, NMS IoU 0.5 and maximum 100 detections per image remained unchanged; the evaluator added no score filter. Original image/category IDs and original-image-pixel COCO `xywh` predictions were retained.
+- **Checkpoint identity:** CPU read-only loading confirms `best.pth` has `epoch=4`, `global_step=14000`, `best_epoch=4`, `best_mAP=0.25544452083836444` and four history rows. `latest.pth` has `epoch=5`, `global_step=17500`, `best_epoch=4`, the same best mAP and five history rows. Both heads have classification weight shape `[11, 1024]` and box-regression weight shape `[44, 1024]`. The saved optimizer uses LR 0.005, momentum 0.9 and weight decay 0.0005. These historical checkpoints do not save the transform in their compact training settings.
+- **Latest report/predictions:** `validation.json` explicitly records `epoch=5`, `split=val`, `performance_result=true` and all 1,000 original image IDs 9001-10000. `predictions.json` contains 75,689 rows over exactly those 1,000 IDs. These files were overwritten after each epoch and are not epoch-4 predictions or detailed epoch-4 metrics.
+
+The following additional metrics belong exclusively to the latest **epoch 5** report:
+
+| Full-validation metric | Epoch 5 actual value (0-1) |
+|---|---:|
+| AP small | 0.09862201757907721 |
+| AP medium | 0.28406951040373796 |
+| AP large | 0.42116857076006453 |
+| AR maxDets 1 | 0.1786465744578652 |
+| AR maxDets 10 | 0.3414586028042812 |
+| AR maxDets 100 | 0.3633652647477816 |
+| AR small | 0.1987752951880332 |
+| AR medium | 0.40825719486511186 |
+| AR large | 0.5474731114931933 |
+
+| Category | GT objects | Epoch 5 AP | Epoch 5 AP50 | Epoch 5 AP75 |
+|---|---:|---:|---:|---:|
+| person | 1280 | 0.24985695502667887 | 0.5802896305643392 | 0.17790428670672098 |
+| rider | 62 | 0.20892616420479454 | 0.43702790616944936 | 0.16852227632557978 |
+| car | 10236 | 0.40691916392184907 | 0.7395005022948862 | 0.39526004063791 |
+| truck | 401 | 0.23370844839239713 | 0.3931502729018184 | 0.24815073772589744 |
+| bus | 165 | 0.2749283524874503 | 0.4501454154913736 | 0.3138924634050609 |
+| train | 0 | Not evaluable | Not evaluable | Not evaluable |
+| motor | 49 | 0.15189792641900268 | 0.42986468279942647 | 0.03943212503068489 |
+| bike | 88 | 0.1483799609689954 | 0.3329491887173545 | 0.1172264780962685 |
+| traffic light | 2714 | 0.185862364245379 | 0.5718299767464834 | 0.060904595890513745 |
+| traffic sign | 3470 | 0.2835344537578371 | 0.5865224419022649 | 0.23548078513884446 |
+
+- **Unavailable best-epoch detail:** Epoch-4 size AP, recall, per-class AP/AP50/AP75 and predictions were not separately retained. They are unavailable from the current artifacts, even though its aggregate mAP/AP50/AP75 are preserved in history and the checkpoint. The audit did not regenerate them or substitute epoch-5 details. Missing railway-train GT is excluded from COCO means rather than zero-filled.
+- **Artifacts/observations:** `outputs/training/20261020_182545_580059/{latest.pth,best.pth,history.csv,validation.json,predictions.json}` remains intact alongside the independent single-epoch run. Training mean loss decreased each epoch; validation mAP peaked at epoch 4 and decreased at epoch 5. This observation alone does not establish convergence or identify the cause. Condition results remain `Not measured`; test remains `Not evaluated`. No training, real image inference, rescoring, benchmarking, dataset edits, installation, download, commit or push occurred during the current artifact audit.
+
+## Fixed 640-by-640 Ten-Epoch Observation Experiment: Prepared, Not Started
+
+- **Status/objective:** Code preparation for a separate experiment is authorized. `EPOCHS=10` and `IMAGE_SIZE=640`; ten epochs are an observation stage, not a claim of sufficient training or convergence. No new run has started, no new training directory/checkpoint/results are recorded, and all new-run performance and elapsed duration are `Not measured`.
+- **Fresh initialization:** The manual command is `& .\.venv\Scripts\python.exe -m src.train` from the repository root, without `--resume`. It uses the existing local cached official `FasterRCNN_ResNet50_FPN_Weights.COCO_V1`, replaces the predictor with a new 11-class head, and creates a separate timestamped run under `outputs/training/`. Neither the single-epoch nor the five-epoch checkpoint is a restoration source. Both historical experiments and all their artifacts remain preserved.
+- **Unchanged settings:** Train/val batch size 2, SGD LR 0.005, momentum 0.9, weight decay 0.0005, seed 42, workers 0, device `cuda:0`, print interval 50, float32, train shuffle true and val shuffle false. No AMP, scheduler, warmup or added data augmentation. Mean/std, FrozenBatchNorm2d, backbone freezing and inference score/NMS/detection-count thresholds remain unchanged. Use the existing `.venv` and local RTX 5070; no cloud or paid resource is created.
+- **Dataset boundary:** Dataset continues to return original-size RGB float32 `[0, 1]` tensors and original pixel `xyxy` boxes. Fixed train/val splits, IDs, categories, images and annotations remain unchanged. Image resize/padding, target-box scaling and prediction restoration occur only in memory inside the model; Dataset converts source `xywh` to `xyxy`, and the export adapter converts restored `xyxy` back to COCO `xywh`. There is no Dataset resize or duplicate normalization.
+- **Actual resize/padding rule:** The detector normalizes once with mean `[0.485, 0.456, 0.406]` and std `[0.229, 0.224, 0.225]`. Its transform inherits Torchvision's aspect-preserving bilinear resize with `min_size=max_size=640`, `align_corners=False` and `recompute_scale_factor=True`; the long edge fits 640, smaller images may be enlarged, and the actual integer resized content dimensions are authoritative. Content is aligned to the canvas's top-left corner. Padding is added only on the right and bottom to produce an exact 640-by-640 canvas in both training and validation. Fill value is zero in normalized tensor space, equivalent to the RGB channel means before normalization, not RGB 114. There is no direct stretching to a square.
+- **Coordinate handling:** Target boxes scale with actual resized width/height ratios. Top-left placement has zero x/y padding offsets. The transform retains each actual content size for RPN/ROI clipping and the native postprocess, which restores predictions to original-image pixel coordinates before the evaluator adapter converts `xyxy` to COCO `xywh`. `SquareCanvasRoIAlign` uses the fixed canvas only to infer FPN feature scales, preventing the content size from implying the wrong pyramid scale; it does not replace the content sizes used for clipping or output restoration.
+- **Saving/selection/continuation:** Every epoch still trains all 7,000 images, performs complete 1,000-image validation and retains the latest/best/history/validation/predictions saving flow. Planned total updates are 35,000 if all ten epochs complete; actual completed updates for this experiment are none. Best selection maximizes complete-validation mAP. Latest JSON files continue to belong to the latest evaluated epoch. New checkpoint settings include the full transform identity and reject restoration when settings are absent or differ, preventing old 800/1333 checkpoints from being silently restored under the new preprocessing.
+- **Comparison limitation:** The target input size is aligned with the teammates' nominal 640-by-640 size. As supplied by the user, YOLO commonly uses aspect-preserving letterbox preprocessing, while the RT-DETRv2 configuration uses direct Resize. Equal target dimensions do not establish identical preprocessing across models; this experiment explicitly records its own placement, fill and interpolation rules.
+- **Verification completed:** The existing `.venv` passed all 32 synthetic tests with `python -m unittest discover -s tests -v`, plus `python -m compileall -q src tests` and training CLI `--help`. Tests cover original Dataset RGB/box/ID outputs using temporary synthetic files, train/val geometry, mixed/partial batches, normalized padding, original-coordinate box/COCO export roundtrip, unchanged files/tensors/COCO records, correct FPN scales and ROI pooling coordinates, report metadata and rejection of missing/different preprocessing on resume. Existing synthetic evaluator and tiny-model update/restore checks also passed; no real Faster R-CNN was constructed or trained. The historical 18-test result is distinct from this rerun.
+- **Preservation checks:** All ten files in the two completed training runs and the dataset README, class mapping and train/val annotations retained identical SHA-256, sizes and modification times before/after this preparation (14 files). No new training run directory was created. This is not a full-dataset integrity audit. The official cached weight hash matches the previously recorded value. English project text, local Markdown links, JSON syntax and Git whitespace checks passed; data/outputs remain ignored/untracked and nothing is staged.
+- **Execution boundary:** No actual Faster R-CNN training, real-data inference/scoring or benchmarking was performed. No test access, dataset modification, dependency installation, weight download, cloud migration, condition analysis, old-best inference, PDF edits, commit or push is included. The assistant must not execute the displayed training command or click Run unless the user later explicitly says that the assistant should execute training.
 
 ## Template for a Future Run
 

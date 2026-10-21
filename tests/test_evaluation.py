@@ -13,6 +13,7 @@ from pycocotools.coco import COCO
 
 from src.dataset import BDD100KDataset
 from src.evaluate import NOT_EVALUABLE, evaluate, evaluate_predictions
+from src.model import SquarePadTransform, get_transform_settings
 from evaluate_team import evaluate as team_evaluate
 
 
@@ -141,6 +142,18 @@ class EvaluationTests(unittest.TestCase):
             self.assertTrue(model.training)
         with self.assertRaises(ValueError):
             evaluate_predictions(self.coco, [], [9001], purpose="validation")
+
+    def test_report_records_fixed_canvas_and_normalized_padding(self):
+        model = SyntheticDetector()
+        model.transform = SquarePadTransform(640, [0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+        loader = [([self.image, self.image], [self.target1, self.target2])]
+        report, _ = evaluate(model, loader, self.dataset, "cpu")
+        settings = report["settings"]["model"]["transform"]
+        self.assertEqual(settings, get_transform_settings(model.transform))
+        self.assertEqual(settings["canvas_size"], [640, 640])
+        self.assertEqual(settings["padding_sides"], ["right", "bottom"])
+        self.assertEqual(settings["padding_value_space"], "normalized")
+        self.assertEqual(settings["roi_pool_scale_reference"], "canvas_size")
 
     def test_empty_and_nonfinite_model_outputs(self):
         model = SyntheticDetector()

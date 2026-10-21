@@ -6,7 +6,7 @@ from torchvision.ops import box_convert
 from evaluate_team import evaluate as evaluate_team_predictions
 
 from .dataset import BDD100KDataset
-from .model import WEIGHTS
+from .model import WEIGHTS, get_transform_settings
 
 
 NOT_EVALUABLE = "Not evaluable"
@@ -71,12 +71,7 @@ def evaluate(model, loader, dataset, device, *, image_ids=None):
                 "architecture": "fasterrcnn_resnet50_fpn",
                 "initial_weights": f"{WEIGHTS.__class__.__name__}.{WEIGHTS.name}",
                 "num_classes": heads.box_predictor.cls_score.out_features,
-                "transform": {
-                    "image_mean": list(transform.image_mean), "image_std": list(transform.image_std),
-                    "min_size": list(transform.min_size), "max_size": transform.max_size,
-                    "size_divisible": transform.size_divisible,
-                    "fixed_size": list(transform.fixed_size) if transform.fixed_size else None,
-                },
+                "transform": get_transform_settings(transform),
                 "roi_heads": {
                     "score_threshold": heads.score_thresh, "nms_iou_threshold": heads.nms_thresh,
                     "detections_per_image": heads.detections_per_img,
