@@ -1,16 +1,18 @@
 # BDD100K Faster R-CNN Baseline
 
-Train and evaluate Torchvision Faster R-CNN ResNet50-FPN on the supplied fixed BDD100K subset. Normal training has returned to Torchvision's default aspect-preserving 800/1333 input rule and native batch padding/ROI pooling. A fresh ten-epoch run with that restored rule is prepared, not started. The user completed three prior independent experiments, all preserved below. Synthetic checks and unexecuted plans are separate from measured results.
+Train and evaluate Torchvision Faster R-CNN ResNet50-FPN on the supplied fixed BDD100K subset. Normal training has returned to Torchvision's default aspect-preserving 800/1333 input rule and native batch padding/ROI pooling. The user completed four independent experiments, including the restored-input ten-epoch run whose best validation mAP is 0.2519508348597597 at epoch 7. The old five-epoch run still has the highest observed mAP, 0.25544452083836444 at epoch 4. All runs are preserved; final baseline selection is pending. Synthetic checks and unexecuted plans are separate from measured results.
 
 ## Start Here
 
-Use the existing `.venv` and local RTX 5070. Current settings at the top of `src/train.py` prepare a fresh ten-epoch run with the default input rule. When the user chooses to start it manually from the repository root, the command is:
+The old five-epoch run has a separate continuation prepared in `outputs/training/20261021_legacy5_to_epoch10/`. Status: **Prepared / Not started**. Use the existing `.venv` and local RTX 5070. Current settings at the top of `src/train.py` retain the default input rule and total target `EPOCHS=10`. The following command is for the user to execute manually from the repository root:
 
 ```powershell
-& .\.venv\Scripts\python.exe -m src.train
+& .\.venv\Scripts\python.exe -m src.train --resume .\outputs\training\20261021_legacy5_to_epoch10\latest.pth
 ```
 
-Without `--resume`, this creates a separate timestamped output directory, initializes from cached official COCO_V1 weights and a new 11-class head, and targets full 7,000-image training plus 1,000-image validation every epoch. It restores none of the three old checkpoints. The restored-input run has not started; its metrics and elapsed duration are `Not measured`. The assistant only displays training commands unless explicitly instructed to execute training.
+This resumes the prepared copy of `20261020_182545_580059/latest.pth`, completed epoch 5 / global step 17,500, and starts epoch 6. It targets epochs 6-10, each with all 7,000 training and 1,000 validation images; total step 35,000 is a plan conditional on completion. It restores model, SGD/momentum, history, counters, best state and Python/NumPy/Torch CPU/CUDA RNG, retaining the parent's epoch-4 best mAP 0.25544452083836444 until strictly exceeded. All four completed experiments remain intact. New continuation metrics and duration are `Not measured`; more epochs do not guarantee improvement. The assistant has not executed training and must not execute it or click Run unless the user explicitly authorizes assistant-executed training.
+
+Without `--resume`, the command instead creates another independent timestamped experiment from cached official COCO_V1 weights and a new 11-class head. It would not continue the old five-epoch run. The completed restored-input run `20261021_022856_226381` is preserved and is not this continuation's source.
 
 | Setting | Current value |
 |---|---:|
@@ -23,25 +25,29 @@ Without `--resume`, this creates a separate timestamped output directory, initia
 | `WEIGHT_DECAY` | 0.0005 |
 | `SEED` | 42 |
 | `DEVICE` | `cuda:0` |
+| `num_workers` | 0 |
 | `PRINT_EVERY` | 50 batches |
 
-These remain provisional settings, not a selected final baseline. Ten epochs are an observation window, not a convergence claim. Only the input rule is restored; this does not adopt an entire official training recipe. SGD remains constant-LR/float32 with no scheduler/warmup/AMP/augmentation and zero workers. The official weights must already be cached under `outputs/torch/hub/checkpoints/`; the trainer refuses to start if they are missing. All three experiments remain separate and preserved. Exact historical durations are `Not measured` because the trainer does not log them.
+These remain provisional settings, not a selected final baseline. Ten epochs are an observation window, not a convergence claim. Only the input rule is restored; this does not adopt an entire official training recipe. SGD remains constant-LR/float32 with no scheduler/warmup/AMP/augmentation and zero workers. The official weights must already be cached under `outputs/torch/hub/checkpoints/`; the trainer refuses to start if they are missing. All four experiments remain separate and preserved. Exact historical durations are `Not measured` because the trainer does not log them.
 
 The input decision was made after inspecting the lower 640 result. Main comparisons may retain each detector's documented official input rule while sharing data, classes, evaluator and checkpoint-selection rules. This compares configured detection systems, not architecture alone or equal compute budgets. The 640 run remains a supplementary result. Its ten-epoch budget differs from the old five-epoch budget, so their best-score gap is not a strict resolution-only ablation. Official defaults are a justified starting point, not a guarantee of the best BDD100K score.
 
 ## Completed Experiments
 
-The first two runs used aspect-preserving short-edge target 800, long-edge limit 1333 and batch padding to multiples of 32. The third used aspect-preserving resize and right/bottom padding to a fixed 640 x 640 canvas.
+The first two and fourth runs used aspect-preserving short-edge target 800, long-edge limit 1333 and batch padding to multiples of 32. The third used aspect-preserving resize and right/bottom padding to a fixed 640 x 640 canvas.
 
 | Run under `outputs/training/` | Completed epochs / updates | Best validation mAP | Best / latest epoch |
 |---|---:|---:|---:|
 | `20261020_155352_056862` | 1 / 3,500 | 0.20033579847015223 | 1 / 1 |
 | `20261020_182545_580059` | 5 / 17,500 | 0.25544452083836444 | 4 / 5 |
 | `20261021_002448_944703` | 10 / 35,000 | 0.17773109411680846 | 4 / 10 |
+| `20261021_022856_226381` | 10 / 35,000 | 0.2519508348597597 | 7 / 10 |
 
 Five-epoch best: `best.pth` is epoch 4 / step 14,000, AP50 0.5170826995660548 and AP75 0.21488694482832407. `latest.pth`, `validation.json` and `predictions.json` are epoch 5 / step 17,500, mAP 0.23822375438048712. The latest detailed metrics/predictions must not be presented as the best model's output. Intermediate detailed reports were overwritten; epoch 4 per-class/size/recall results are not separately available. Saved histories, reports, prediction coverage and CPU-only checkpoint metadata were inspected without new inference or scoring. See [Experiment Log](docs/EXPERIMENT_LOG.md) for every epoch.
 
 Ten-epoch 640 best: `best.pth` is epoch 4 / step 14,000, mAP 0.17773109411680846, AP50 0.3619035810493331 and AP75 0.15257382817657714. Latest checkpoint and JSON files are epoch 10 / step 35,000, mAP 0.17702375663177553; the prediction file contains 64,422 detections over all 1,000 validation IDs. Its epoch-4 detailed metrics/predictions were not retained separately. The best-score difference from the old five-epoch run is -7.7713426721555985 percentage points. Training loss kept decreasing and the last two validation scores increased; sufficient convergence and a causal explanation are unverified. Saved artifacts were inspected without running training, inference or scoring again.
+
+Restored-input ten-epoch best: `best.pth` is epoch 7 / step 24,500, mAP 0.2519508348597597, AP50 0.5155850158288147 and AP75 0.2030129302252958. Latest checkpoint and JSON files are epoch 10 / step 35,000, mAP 0.24015201202561187; predictions contain 61,137 detections over all 1,000 original validation IDs. Epoch-7 detailed metrics/predictions were not retained separately. The best is 0.34936859786047214 percentage points below the old five-epoch best. Later validation fluctuated while training loss decreased; simply extending this unchanged constant learning rate has not shown sustained validation improvement. The gap's cause and statistical significance are not established. No new training setting or final baseline was selected during this artifact review.
 
 ## Read the Code
 
@@ -52,6 +58,7 @@ Training and model inference are in four files, with scoring delegated to the su
 | [src/dataset.py](src/dataset.py) | Read the fixed train/val COCO data; detection collation and DataLoader |
 | [src/model.py](src/model.py) | Official COCO_V1 weights, new 11-class head and default preprocessing; optional historical square helpers |
 | [src/train.py](src/train.py) | Settings, `train_one_epoch()`, the epoch loop, and small save/resume helpers |
+| [src/prepare_continuation.py](src/prepare_continuation.py) | Explicit CPU-only preparation of the audited legacy five-epoch branch; never trains |
 | [src/evaluate.py](src/evaluate.py) | Validation inference and original-ID prediction export; delegates scoring to the team script |
 | [evaluate_team.py](evaluate_team.py) | Shared COCO bbox scoring and fixed validation-condition evaluation |
 
@@ -74,9 +81,13 @@ For a future continuation of a newly created **matching default-input run**, inc
 & .\.venv\Scripts\python.exe -m src.train --resume outputs/training/<run>/latest.pth
 ```
 
-Continuation stays in the same output directory. Checkpoints store model/SGD state, completed epoch/global step, best mAP/epoch, training settings, categories, compact epoch history, and Python/NumPy/Torch CPU/CUDA RNG. RNG is restored before constructing the next shuffled iterator. Latest is saved atomically before best; if that boundary was itself best, resume can rebuild best from latest. Keep an earlier `best.pth` beside latest when their epochs differ.
+Continuation stays in the checkpoint's directory. The explicitly prepared old-five-epoch branch uses its new directory and never writes into the parent. Checkpoints store model/SGD state, completed epoch/global step, best mAP/epoch, training settings, categories, compact epoch history, and Python/NumPy/Torch CPU/CUDA RNG. RNG is restored before constructing the next shuffled iterator. Latest is saved atomically before best; if that boundary was itself best, resume can rebuild best from latest. An earlier sibling `best.pth` must match the restored history, categories, settings and best identity.
 
-Only compatible checkpoints produced by this simplified trainer are accepted. Settings include preprocessing identity and workers 0. The 640 checkpoint is rejected because its transform differs; the older one-/five-epoch checkpoints still lack transform metadata and are rejected rather than silently inferred or migrated. Start the prepared run without `--resume`. Earlier artifacts remain untouched. Resume requires unchanged data/settings and workers 0. An incomplete epoch is replayed; the first epoch has no recovery point until validation completes. Batch-level/distributed/multi-worker resume and bitwise agreement across hardware/versions are unsupported. The trainer does not compare environment or data hashes, and deterministic algorithms are not forced.
+Strict resume checks remain active: settings include preprocessing identity and workers 0, with complete history/counter/best, SGD momentum and RNG checks. Directly resuming original legacy checkpoints still fails for missing metadata; the 640 transform also remains incompatible. `src.prepare_continuation` is an explicit, separate CPU-only conversion restricted to the audited five-epoch source and its five artifact SHA-256 fingerprints. Saved epoch-5 transform fields and historical source/installed Torchvision establish only the missing `settings.transform` and `settings.num_workers`; the original model, optimizer, history, counters and RNG values are preserved. No automatic migration or global validation bypass is added.
+
+The prepared branch contains `latest.pth` (inherited epoch 5), `best.pth` (inherited epoch 4), `history.csv` (inherited rows 1-5), `continuation.json` and `checkpoint_verification.json`. The manifest records parent/source hashes, branch point, field evidence and planned settings; the verification records exact CPU disk-roundtrip preservation. Both checkpoints carry `continuation` and `best_source`, which future saves retain. The inherited best source remains the parent's `best.pth` and hash until complete-validation mAP strictly exceeds 0.25544452083836444; ties retain it. A future validation report's `epoch` identifies its actual evaluated model, while `best_model` separately identifies the selected best. Parent `validation.json` / `predictions.json` remain epoch 5 and are not copied; missing epoch-4 details are not regenerated.
+
+Resume requires unchanged data/settings and workers 0. An incomplete epoch is replayed; the first epoch has no recovery point until validation completes. Batch-level/distributed/multi-worker resume and bitwise agreement across hardware/versions are unsupported. The original run did not record executed source/runtime/data hashes; evidenced metadata reconstruction cannot prove exact execution identity or bitwise CUDA trajectory. The trainer does not compare environment or data hashes, and deterministic algorithms are not forced.
 
 ## Dataset and Evaluation Rules
 
@@ -103,7 +114,7 @@ For a completed run's exported predictions, the team's CLI can score full valida
 & .\.venv\Scripts\python.exe evaluate_team.py --root data/bdd100k_subset_10k --predictions outputs/training/<run>/predictions.json --split val --output outputs/training/<run>/team_validation.json
 ```
 
-The standalone full-validation/condition CLI above has not been run; per-epoch full-validation scoring has completed inside training for all three completed experiments. The trainer's `predictions.json` belongs to the latest evaluated epoch, as identified in `validation.json`, and is not necessarily from `best.pth`. The shared CLI emits JSON and CSV. It applies no extra confidence filter or box clipping; model-side candidate export rules must be agreed across the group. Current Faster R-CNN thresholds remain unchanged and recorded. Condition analysis is outside this preparation stage.
+The standalone full-validation/condition CLI above has not been run; per-epoch full-validation scoring has completed inside training for all four completed experiments. The trainer's `predictions.json` belongs to the latest evaluated epoch, as identified in `validation.json`, and is not necessarily from `best.pth`. The shared CLI emits JSON and CSV. It applies no extra confidence filter or box clipping; model-side candidate export rules must be agreed across the group. Current Faster R-CNN thresholds remain unchanged and recorded. Condition analysis is outside this preparation stage.
 
 The shared script includes a test option for future final evaluation, but training never invokes it. Test data must remain unused for selection/tuning until model and parameters are fixed. No full condition or test evaluation has been run. No prediction visualization is generated.
 
@@ -115,7 +126,7 @@ The older `src/check_data.py`, `src/check_model.py`, `src/check_training.py`, an
 & .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
 
-The historical 640 preparation passed 32 synthetic tests, and the user completed that experiment. The current default-input restoration passed **34 synthetic tests**, compilation and training CLI help, including current-setting native transform/pooler identity, default geometry/box restoration and rejection of historical checkpoint settings. No real Faster R-CNN was constructed, trained or inferred for verification; no real-data scoring, benchmark or test access occurred. The prepared restored-input run has not started, and its performance is unmeasured.
+The historical 640 preparation passed 32 synthetic tests; default-input restoration passed 34. Both subsequent user-run experiments are recorded above, and their documentation-only artifact review did not rerun that historical suite. The current continuation preparation passed **41 synthetic CPU tests** with CUDA hidden, compilation of `src` / `tests` and both CLI help commands. Independent CPU `weights_only=True` disk roundtrips preserved every original checkpoint key/state value except the two evidenced settings additions and new lineage fields: each checkpoint retained 295 finite model tensors, 72 finite nonzero momentum buffers and all four RNG families including one saved CUDA state. All twenty original artifacts across the four completed experiments retained identical SHA-256, sizes and modification times. Train/val annotations and mapping confirm 7,000 / 1,000 images and unchanged categories; no source image was decoded and no new dataset hash audit is claimed. Cached official weights exist (167,502,836 bytes) but were not loaded or downloaded. No real Faster R-CNN was constructed/trained/inferred, no real-data scoring/benchmark/test access occurred, and CUDA restoration/bitwise trajectory was not executed.
 
 See [Current Status](docs/CURRENT_STATUS.md), [Experiment Log](docs/EXPERIMENT_LOG.md), [Project Context](docs/PROJECT_CONTEXT.md), [Environment](docs/ENVIRONMENT.md), and [AGENTS.md](AGENTS.md). Reuse the environment; no dependency installation is needed.
 

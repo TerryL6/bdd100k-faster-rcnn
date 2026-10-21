@@ -89,6 +89,7 @@ def main():
     optimizer = make_optimizer(model, settings["optimizer"])
     start_epoch, global_step, best_map, best_epoch = 1, 0, -1.0, 0
     history = []
+    continuation, best_source = None, None
 
     # Optional continuation uses the same run directory and its existing best model.
     if args.resume:
@@ -101,6 +102,7 @@ def main():
             raise ValueError("This entry point resumes only checkpoints from the simplified trainer.")
         categories = train_dataset.coco.dataset["categories"]
         validate_resume_settings(saved, settings, categories)
+        validate_resume_state(saved, len(train_loader))
         start_epoch = saved["epoch"] + 1
         if EPOCHS < start_epoch or saved["global_step"] != saved["epoch"] * len(train_loader):
             raise ValueError("Increase EPOCHS and keep the same training dataset on resume.")
@@ -108,10 +110,16 @@ def main():
         optimizer.load_state_dict(saved["optimizer_state_dict"])
         global_step, best_map, best_epoch = saved["global_step"], saved["best_mAP"], saved["best_epoch"]
         history = saved["history"]
+        continuation = saved.get("continuation")
+        best_source = saved.get("best_source")
         if best_epoch == saved["epoch"]:
             save_checkpoint(output_dir / "best.pth", saved)
         elif not (output_dir / "best.pth").is_file():
             raise FileNotFoundError("Keep the run's earlier best.pth alongside latest.pth.")
+        else:
+            earlier_best = torch.load(output_dir / "best.pth", map_location="cpu", weights_only=True)
+            validate_best_checkpoint(saved, earlier_best, len(train_loader))
+            del earlier_best
         restore_rng_state(saved["rng_state"])
         del saved
     else:
@@ -119,6 +127,11 @@ def main():
         output_dir.mkdir(parents=True, exist_ok=False)
     write_history(output_dir / "history.csv", history)
     print(f"Run: {output_dir}\nTrain images={len(train_dataset)}, validation images={len(val_dataset)}", flush=True)
+    if args.resume:
+        displayed_best = best_source or {"checkpoint": str(output_dir / "best.pth"),
+                                         "epoch": best_epoch, "mAP": best_map}
+        print(f"Resume: completed_epoch={start_epoch - 1} global_step={global_step} "
+              f"next_epoch={start_epoch} target_epoch={EPOCHS}\nBest source: {displayed_best}", flush=True)
 
     # 3. Train a complete epoch, evaluate validation, and save the results.
     for epoch in range(start_epoch, EPOCHS + 1):
@@ -132,6 +145,8 @@ def main():
         improved = score > best_map
         if improved:
             best_map, best_epoch = score, epoch
+            best_source = {"checkpoint": (output_dir / "best.pth").relative_to(REPO_ROOT).as_posix(),
+                           "epoch": epoch, "global_step": global_step, "mAP": score}
         history.append({"epoch": epoch, "global_step": global_step, **training["losses"],
                         "total_loss": training["total_loss"], "lr": optimizer.param_groups[0]["lr"],
                         "mAP": score, "AP50": metrics["bbox_AP50"], "AP75": metrics["bbox_AP75"]})
@@ -139,12 +154,13 @@ def main():
                       "model_state_dict": model.state_dict(), "optimizer_state_dict": optimizer.state_dict(),
                       "best_mAP": best_map, "best_epoch": best_epoch, "settings": settings,
                       "categories": train_dataset.coco.dataset["categories"], "rng_state": capture_rng_state(),
-                      "history": history}
+                      "history": history, "continuation": continuation, "best_source": best_source}
         save_checkpoint(output_dir / "latest.pth", checkpoint)
         if improved:
             save_checkpoint(output_dir / "best.pth", checkpoint)
         write_history(output_dir / "history.csv", history)
         validation["epoch"] = epoch
+        validation["best_model"] = best_source
         for name, value in (("validation.json", validation), ("predictions.json", predictions)):
             (output_dir / name).write_text(json.dumps(value, indent=2, allow_nan=False) + "\n", encoding="utf-8")
         print(f"epoch={epoch} mean_loss={training['total_loss']:.4f} "
@@ -158,6 +174,46 @@ def validate_resume_settings(saved, settings, categories):
         raise ValueError("Checkpoint preprocessing differs or is missing. Start a fresh run without --resume.")
     if saved["settings"] != settings or saved["categories"] != categories:
         raise ValueError("Keep training settings and categories unchanged on resume; only EPOCHS may increase.")
+
+
+def validate_resume_state(saved, steps_per_epoch):
+    """Reject incomplete boundary state instead of falling back to weights-only loading."""
+    required = {"model_state_dict", "optimizer_state_dict", "rng_state", "history",
+                "epoch", "global_step", "best_epoch", "best_mAP"}
+    if not required.issubset(saved):
+        raise ValueError("Resume requires complete model, optimizer, history, best and RNG state.")
+    epoch, history = saved["epoch"], saved["history"]
+    if epoch < 1 or saved["global_step"] != epoch * steps_per_epoch or len(history) != epoch:
+        raise ValueError("Checkpoint epoch, history and global step disagree.")
+    for index, row in enumerate(history, start=1):
+        if row["epoch"] != index or row["global_step"] != index * steps_per_epoch:
+            raise ValueError("Checkpoint history is not a complete sequence of epoch boundaries.")
+        if not isinstance(row["mAP"], (int, float)) or not math.isfinite(row["mAP"]):
+            raise ValueError("Checkpoint history contains an undefined validation mAP.")
+    best = max(history, key=lambda row: row["mAP"])
+    if saved["best_epoch"] != best["epoch"] or saved["best_mAP"] != best["mAP"]:
+        raise ValueError("Checkpoint best state disagrees with full history.")
+    rng = saved["rng_state"]
+    if set(rng) != {"python", "numpy", "cpu", "cuda"}:
+        raise ValueError("Resume requires Python, NumPy, Torch CPU and CUDA RNG state.")
+    groups, state = saved["optimizer_state_dict"]["param_groups"], saved["optimizer_state_dict"]["state"]
+    for group in groups:
+        if group["momentum"] and any("momentum_buffer" not in state.get(key, {}) for key in group["params"]):
+            raise ValueError("Resume requires saved SGD momentum for every optimized parameter.")
+    if not groups or not saved["model_state_dict"]:
+        raise ValueError("Checkpoint model or optimizer state is empty.")
+
+
+def validate_best_checkpoint(latest, best, steps_per_epoch):
+    """Keep an earlier best only when it belongs to the restored history/settings."""
+    validate_resume_settings(best, latest["settings"], latest["categories"])
+    validate_resume_state(best, steps_per_epoch)
+    if (best.get("kind") != latest["kind"] or best["epoch"] != latest["best_epoch"]
+            or best["best_epoch"] != latest["best_epoch"] or best["best_mAP"] != latest["best_mAP"]
+            or best["history"] != latest["history"][:best["epoch"]]
+            or best.get("continuation") != latest.get("continuation")
+            or best.get("best_source") != latest.get("best_source")):
+        raise ValueError("Earlier best.pth does not match the restored run's best state and history.")
 
 
 def make_optimizer(model, settings):
